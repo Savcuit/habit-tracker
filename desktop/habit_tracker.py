@@ -310,9 +310,6 @@ class DetailPanel(tk.Frame):
         self.btn_up = FlatButton(self.footer, "↑", lambda: self.app.move_habit(self.habit, -1),
                                  fg=MUTED, bg=PANEL, hover=mix(PANEL, ACCENT, 0.15),
                                  border=BORDER, padx=10)
-        self.btn_up.pack(side="left")
-        self.btn_down.pack(side="left", padx=(8, 0))
-
         self.hint = tk.Label(self.footer, text="double-click a habit to edit · click a day to change it",
                              fg=MUTED, bg=PANEL, font=F_SMALL)
         self.hint.pack(side="left", padx=14)
@@ -347,6 +344,8 @@ class DetailPanel(tk.Frame):
             self.subtitle.configure(text="Add a habit with the button above.")
             self.btn_today.pack_forget()
             self.btn_delete.pack_forget()
+            self.btn_up.pack_forget()
+            self.btn_down.pack_forget()
             self.chip.delete("all")
             for card in self._stat_cards:
                 card.configure(text="–")
@@ -357,6 +356,8 @@ class DetailPanel(tk.Frame):
         self._ensure_cards()
         self.btn_today.pack(side="left", padx=(0, 8))
         self.btn_delete.pack(side="right")
+        self.btn_up.pack(side="left")
+        self.btn_down.pack(side="left", padx=(8, 0))
 
         self.title.configure(text=habit.name)
         created = date.fromisoformat(habit.created)
@@ -759,6 +760,8 @@ class App(tk.Tk):
         HabitDialog(self, applied, habit=habit)
 
     def move_habit(self, habit: Habit, offset: int):
+        if habit is None:
+            return
         ids = [h.id for h in self.store.habits]
         i = ids.index(habit.id)
         j = i + offset
