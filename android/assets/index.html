@@ -259,10 +259,23 @@ function renderDetail(){
 
   const head = document.createElement("div");
   head.className = "card";
-  head.innerHTML = `<div style="font-size:16px;font-weight:700">${escapeHtml(h.name)}</div>
+  head.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div style="font-size:16px;font-weight:700">${escapeHtml(h.name)}</div>
+      <div id="editBtn" style="font-size:12px;color:var(--accent);border:1px solid var(--border);
+           border-radius:9px;padding:6px 10px">Edit</div></div>
     <div class="sub" style="margin-top:4px">Started ${parse(h.created).toLocaleDateString(undefined,
       {day:"numeric", month:"short", year:"numeric"})} · target ${h.target} days a week</div>`;
   host.appendChild(head);
+  document.getElementById("editBtn").addEventListener("click", () => {
+    document.getElementById("nameInput").value = h.name;
+    draftColour = h.color;
+    draftTarget = h.target;
+    editing = h;
+    buildDialog();
+    document.querySelector("#dlg b").textContent = "EDIT HABIT";
+    document.getElementById("saveBtn").textContent = "Save";
+    document.getElementById("dlg").showModal();
+  });
 
   const heatLabel = document.createElement("div");
   heatLabel.className = "label";
@@ -278,6 +291,8 @@ function renderDetail(){
     const cell = document.createElement("div");
     cell.className = "cell" + (isDone(h,key) ? " on" : "") + (key === todayStr() ? " today" : "");
     if(isDone(h,key)) cell.style.background = h.color;
+    cell.title = key;
+    cell.addEventListener("click", () => { toggle(h, key); render(); });
     heat.appendChild(cell);
   }
   host.appendChild(heat);
@@ -315,11 +330,21 @@ function renderDetail(){
     <button class="btn ghost" id="deleteBtn" style="color:var(--danger)">Delete habit</button>`;
   host.appendChild(actions);
   document.getElementById("deleteBtn").addEventListener("click", () => {
-    if(confirm("Delete “" + h.name + "” and all of its history?")){
-      state.habits = state.habits.filter(x => x.id !== h.id);
-      selectedId = state.habits.length ? state.habits[0].id : null;
-      save(); render();
-    }
+    if(!confirm("Delete “" + h.name + "” and all of its history?")) return;
+    const index = state.habits.findIndex(x => x.id === h.id);
+    const removed = state.habits.splice(index, 1)[0];
+    selectedId = state.habits.length ? state.habits[0].id : null;
+    save(); render();
+    const bar = document.createElement("div");
+    bar.style.cssText = "position:fixed;left:12px;right:12px;bottom:18px;background:#101a2e;border:1px solid #1e2d47;border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;z-index:9";
+    bar.innerHTML = '<span>Deleted “' + escapeHtml(removed.name) + '”</span><b style="color:var(--accent)">UNDO</b>';
+    bar.querySelector("b").addEventListener("click", () => {
+      state.habits.splice(index, 0, removed);
+      selectedId = removed.id;
+      save(); render(); bar.remove();
+    });
+    document.body.appendChild(bar);
+    setTimeout(() => bar.remove(), 6000);
   });
 }
 
@@ -330,6 +355,7 @@ function escapeHtml(s){
 /* ------------------------------------------------------------------- new ---*/
 let draftColour = PALETTE[0];
 let draftTarget = 7;
+let editing = null;
 
 function buildDialog(){
   const sw = document.getElementById("swatches");
@@ -353,9 +379,12 @@ function buildDialog(){
 }
 
 document.getElementById("addBtn").addEventListener("click", () => {
+  editing = null;
   document.getElementById("nameInput").value = "";
   draftColour = PALETTE[Math.floor(Math.random()*PALETTE.length)];
   draftTarget = 7;
+  document.querySelector("#dlg b").textContent = "NEW HABIT";
+  document.getElementById("saveBtn").textContent = "Create";
   buildDialog();
   document.getElementById("dlg").showModal();
 });
@@ -363,6 +392,17 @@ document.getElementById("cancelBtn").addEventListener("click", () => document.ge
 document.getElementById("saveBtn").addEventListener("click", () => {
   const name = document.getElementById("nameInput").value.trim();
   if(!name) return;
+  if(editing){
+    editing.name = name;
+    editing.color = draftColour;
+    editing.target = draftTarget;
+    selectedId = editing.id;
+    editing = null;
+    save();
+    document.getElementById("dlg").close();
+    render();
+    return;
+  }
   const habit = {
     id: Date.now().toString(36),
     name, color: draftColour, target: draftTarget,

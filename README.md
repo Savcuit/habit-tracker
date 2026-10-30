@@ -64,3 +64,20 @@ Java wrapper is a single `WebView`. Requires JDK, Android SDK platform and build
 - The 30-day rate counts from the day the habit was created, so a new habit is not punished
   for the days before it existed.
 - The Android build requests **no permissions** — it has no internet access at all.
+
+## Version 2 — what is new
+
+**Desktop**
+
+- **Click any square in the heatmap** to tick or untick that exact day — correct a missed day
+  without touching the menu.
+- **Double-click a habit** to edit its name, colour and weekly target.
+- **↑ / ↓ buttons** reorder habits in the list.
+- **Ctrl+Z restores a deleted habit**, together with all of its history.
+- **Backup** button writes a copy of the whole data file.
+
+**Android**
+
+- Tap any heatmap square to change that day.
+- **Edit** button on the habit card — rename, recolour, retarget.
+- Deleting shows an **UNDO** bar for six seconds.

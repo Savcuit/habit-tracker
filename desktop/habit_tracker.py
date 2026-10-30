@@ -6,6 +6,7 @@ Interface only; all storage and statistics live in habit_store.py.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tkinter as tk
 from datetime import date, datetime, timedelta
@@ -136,11 +137,12 @@ class ProgressRing(tk.Canvas):
 class HabitRow(tk.Frame):
     """One habit in the left-hand list."""
 
-    def __init__(self, master, habit: Habit, on_select, on_toggle):
+    def __init__(self, master, habit: Habit, on_select, on_toggle, on_edit=None):
         super().__init__(master, bg=PANEL, cursor="hand2")
         self.habit = habit
         self.on_select = on_select
         self.on_toggle = on_toggle
+        self.on_edit = on_edit
         self.selected = False
         self.hovered = False
 
@@ -168,6 +170,7 @@ class HabitRow(tk.Frame):
 
         for widget in (self, self.inner, textwrap, self.name, self.sub, self.streak):
             widget.bind("<Button-1>", self._select)
+            widget.bind("<Double-Button-1>", self._edit)
             widget.bind("<Enter>", self._enter)
             widget.bind("<Leave>", self._leave)
 
@@ -228,6 +231,11 @@ class HabitRow(tk.Frame):
     def _select(self, _e=None):
         self.on_select(self.habit)
 
+    def _edit(self, _e=None):
+        if self.on_edit:
+            self.on_edit(self.habit)
+        return "break"
+
     def _toggle(self, _e=None):
         self.on_toggle(self.habit)
         return "break"
@@ -268,8 +276,10 @@ class DetailPanel(tk.Frame):
                                    font=(FONT, 8, "bold"), anchor="w")
         self.heat_label.pack(fill="x", padx=22, pady=(10, 4))
 
-        self.heat = tk.Canvas(self, bg=PANEL, highlightthickness=0, height=250)
+        self._cells = []
+        self.heat = tk.Canvas(self, bg=PANEL, highlightthickness=0, height=250, cursor="hand2")
         self.heat.pack(fill="x", padx=22, pady=(0, 6))
+        self.heat.bind("<Button-1>", self._heat_click)
 
         self.weekday_label = tk.Label(self, text="SUCCESS BY WEEKDAY", fg=MUTED, bg=PANEL,
                                       font=(FONT, 8, "bold"), anchor="w")
@@ -288,6 +298,24 @@ class DetailPanel(tk.Frame):
                                      fg=MUTED, bg=PANEL, hover=mix(PANEL, ACCENT, 0.15),
                                      border=BORDER)
         self.btn_export.pack(side="right", padx=(0, 8))
+
+        self.btn_backup = FlatButton(self.footer, "Backup", lambda: self.app.backup_json(),
+                                     fg=MUTED, bg=PANEL, hover=mix(PANEL, ACCENT, 0.15),
+                                     border=BORDER)
+        self.btn_backup.pack(side="right", padx=(0, 8))
+
+        self.btn_down = FlatButton(self.footer, "↓", lambda: self.app.move_habit(self.habit, +1),
+                                   fg=MUTED, bg=PANEL, hover=mix(PANEL, ACCENT, 0.15),
+                                   border=BORDER, padx=10)
+        self.btn_up = FlatButton(self.footer, "↑", lambda: self.app.move_habit(self.habit, -1),
+                                 fg=MUTED, bg=PANEL, hover=mix(PANEL, ACCENT, 0.15),
+                                 border=BORDER, padx=10)
+        self.btn_up.pack(side="left")
+        self.btn_down.pack(side="left", padx=(8, 0))
+
+        self.hint = tk.Label(self.footer, text="double-click a habit to edit · click a day to change it",
+                             fg=MUTED, bg=PANEL, font=F_SMALL)
+        self.hint.pack(side="left", padx=14)
 
         self._stat_cards = []
         self.show(None)
@@ -394,6 +422,7 @@ class DetailPanel(tk.Frame):
             c.create_text(left - 14, y0 + r * (cell + gap) + cell / 2,
                           text=WEEKDAYS[r], fill=MUTED, font=(FONT, 8))
 
+        self._cells = []
         for index, (day, done) in enumerate(days):
             col = index // rows
             row = index % rows
@@ -411,6 +440,15 @@ class DetailPanel(tk.Frame):
                 first = days[col * rows][0]
                 c.create_text(x0 + col * (cell + gap) + cell / 2, y0 + grid_h + 14,
                               text=first.strftime("%d/%m"), fill=MUTED, font=(FONT, 8))
+
+    def _heat_click(self, event):
+        """Tap a square in the heatmap to tick or untick that particular day."""
+        if not self.habit:
+            return
+        for x1, y1, x2, y2, day in self._cells:
+            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+                self.app.toggle_day(self.habit, day)
+                return
 
     def _draw_weekday_chart(self):
         """Seven bars: how often each weekday was completed, as a percentage."""
@@ -468,20 +506,24 @@ class DetailPanel(tk.Frame):
         self.app.export_csv()
 
 
-class NewHabitDialog(tk.Toplevel):
-    def __init__(self, master, on_create):
+class HabitDialog(tk.Toplevel):
+    """Create a new habit, or edit an existing one when `habit` is given."""
+
+    def __init__(self, master, on_create, habit=None):
         super().__init__(master)
         self.on_create = on_create
-        self.title("New habit")
+        self.title("Edit habit" if habit else "New habit")
         self.configure(bg=PANEL)
         self.resizable(False, False)
         self.transient(master)
         self.grab_set()
 
+        self.existing = habit
+
         pad = tk.Frame(self, bg=PANEL, padx=24, pady=20)
         pad.pack(fill="both", expand=True)
 
-        tk.Label(pad, text="NEW HABIT", fg=ACCENT, bg=PANEL,
+        tk.Label(pad, text="EDIT HABIT" if habit else "NEW HABIT", fg=ACCENT, bg=PANEL,
                  font=(FONT, 9, "bold")).pack(anchor="w")
 
         self.entry = tk.Entry(pad, bg=PANEL_2, fg=TEXT, insertbackground=ACCENT,
@@ -489,10 +531,10 @@ class NewHabitDialog(tk.Toplevel):
                               highlightthickness=1, highlightbackground=BORDER,
                               highlightcolor=ACCENT)
         self.entry.pack(fill="x", pady=(10, 14), ipady=6)
-        self.entry.insert(0, "")
+        self.entry.insert(0, habit.name if habit else "")
 
         tk.Label(pad, text="Colour", fg=MUTED, bg=PANEL, font=F_SMALL).pack(anchor="w")
-        self.colour = PALETTE[0]
+        self.colour = habit.color if habit else PALETTE[0]
         swatches = tk.Frame(pad, bg=PANEL)
         swatches.pack(fill="x", pady=(4, 14))
         self._swatch_labels = {}
@@ -504,7 +546,7 @@ class NewHabitDialog(tk.Toplevel):
             self._swatch_labels[colour] = lab
 
         tk.Label(pad, text="Days per week", fg=MUTED, bg=PANEL, font=F_SMALL).pack(anchor="w")
-        self.target = tk.IntVar(value=7)
+        self.target = tk.IntVar(value=habit.target if habit else 7)
         row = tk.Frame(pad, bg=PANEL)
         row.pack(fill="x", pady=(4, 16))
         for n in range(1, 8):
@@ -516,7 +558,7 @@ class NewHabitDialog(tk.Toplevel):
 
         buttons = tk.Frame(pad, bg=PANEL)
         buttons.pack(fill="x")
-        FlatButton(buttons, "Create", self._create, fg=BG, bg=ACCENT,
+        FlatButton(buttons, "Save" if habit else "Create", self._create, fg=BG, bg=ACCENT,
                    hover=mix(ACCENT, "#ffffff", 0.25)).pack(side="right")
         FlatButton(buttons, "Cancel", self.destroy, fg=MUTED, bg=PANEL,
                    hover=mix(PANEL, ACCENT, 0.15)).pack(side="right", padx=(0, 8))
@@ -554,6 +596,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.store = HabitStore()
+        self._last_deleted = None
         self.selected: Habit | None = self.store.habits[0] if self.store.habits else None
 
         self.title("Habit Tracker")
@@ -639,6 +682,7 @@ class App(tk.Tk):
         self.bind("<space>", lambda e: self._toggle_selected())
         self.bind("<Delete>", lambda e: self._delete_selected())
         self.bind("<Escape>", lambda e: self._select(None))
+        self.bind("<Control-z>", lambda e: self.undo_delete())
 
     def _on_wheel(self, event):
         try:
@@ -670,7 +714,7 @@ class App(tk.Tk):
             empty.pack(anchor="w", padx=10, pady=16)
             return
         for habit in self.store.habits:
-            row = HabitRow(self.list_frame, habit, self._select, self.toggle_habit)
+            row = HabitRow(self.list_frame, habit, self._select, self.toggle_habit, self.edit_habit)
             row.pack(fill="x", pady=1, padx=(0, 6))
             row.set_selected(self.selected is not None and habit.id == self.selected.id)
             self.rows.append(row)
@@ -696,12 +740,54 @@ class App(tk.Tk):
         self._refresh_all()
         self._status(f"{'Done' if habit.is_done() else 'Cleared'}: {habit.name}")
 
+    def toggle_day(self, habit: Habit, day):
+        """Tick or untick one particular date (used by the heatmap)."""
+        state = habit.toggle(day)
+        self.store.save()
+        self.selected = habit
+        self._refresh_all()
+        pretty = day.strftime("%d %b") if hasattr(day, "strftime") else str(day)
+        self._status(f"{'Done' if state else 'Cleared'} {pretty}: {habit.name}")
+
+    def edit_habit(self, habit: Habit):
+        def applied(name, colour, target):
+            habit.name, habit.color, habit.target = name, colour, target
+            self.store.save()
+            self._refresh_all()
+            self._status(f"Updated {habit.name}")
+
+        HabitDialog(self, applied, habit=habit)
+
+    def move_habit(self, habit: Habit, offset: int):
+        ids = [h.id for h in self.store.habits]
+        i = ids.index(habit.id)
+        j = i + offset
+        if 0 <= j < len(self.store.habits):
+            habits = self.store.habits
+            habits[i], habits[j] = habits[j], habits[i]
+            self.store.save()
+            self._refresh_all()
+            self._status("Reordered")
+
+    def undo_delete(self):
+        if not self._last_deleted:
+            self._status("Nothing to undo")
+            return
+        habit, index = self._last_deleted
+        self.store.habits.insert(min(index, len(self.store.habits)), habit)
+        self.store.save()
+        self.selected = habit
+        self._last_deleted = None
+        self._refresh_all()
+        self._status(f"Restored {habit.name}")
+
     def delete_habit(self, habit: Habit):
         if not messagebox.askyesno("Delete habit",
                                    f"Delete “{habit.name}” and all of its history?",
                                    parent=self):
             return
         was_selected = self.selected is not None and self.selected.id == habit.id
+        self._last_deleted = (habit, self.store.habits.index(habit))
         self.store.remove(habit)
         if was_selected:
             self.selected = self.store.habits[0] if self.store.habits else None
@@ -715,7 +801,7 @@ class App(tk.Tk):
             self._refresh_all()
             self._status(f"Added {habit.name}")
 
-        NewHabitDialog(self, created)
+        HabitDialog(self, created)
 
     def export_csv(self):
         path = filedialog.asksaveasfilename(
@@ -729,6 +815,21 @@ class App(tk.Tk):
             self._status(f"Exported to {os.path.basename(path)}")
         except OSError as exc:
             messagebox.showerror("Export failed", str(exc), parent=self)
+
+    def backup_json(self):
+        """Save a copy of the whole data file, habits and history included."""
+        path = filedialog.asksaveasfilename(
+            parent=self, title="Back up habits", defaultextension=".json",
+            initialfile=f"habits-backup-{today().isoformat()}.json",
+            filetypes=[("JSON file", "*.json")])
+        if not path:
+            return
+        try:
+            self.store.save()
+            shutil.copyfile(self.store.path, path)
+            self._status(f"Backup saved: {os.path.basename(path)}")
+        except OSError as exc:
+            messagebox.showerror("Backup failed", str(exc), parent=self)
 
     def _status(self, message: str):
         stamp = datetime.now().strftime("%H:%M")
