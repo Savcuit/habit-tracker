@@ -131,3 +131,18 @@ month arrows. Tapping any day opens that day's habits, so a forgotten day can be
 **More** — your name, the accent colour for the whole interface, JSON export and import,
 and an erase option. All data stays on the device; the storage format is versioned and older
 files are migrated automatically.
+
+## iPhone and iPad
+
+The same page is published as a web app, so it installs on iOS without a Mac or an App Store
+account:
+
+1. Open **https://savcuit.github.io/habit-tracker/** in Safari.
+2. Tap **Share → Add to Home Screen**.
+
+It then opens full screen with its own icon, keeps working offline, and stores everything on the
+device exactly as the Android build does. To move existing history across, use **More → Export
+backup** on the old device and **Import** on the new one.
+
+The published copy lives in `docs/`; `index.html` there is the same file as `android/assets/index.html`
+plus the Apple meta tags, `manifest.json` and a small service worker for offline use.
