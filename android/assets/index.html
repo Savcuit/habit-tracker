@@ -2,216 +2,320 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#070d18">
 <title>Habit Tracker</title>
 <style>
   :root{
-    --bg:#0a1120; --panel:#101a2e; --panel2:#0d1626; --border:#1e2d47;
-    --text:#e6f1ff; --muted:#7c8ba6; --accent:#22d3ee; --gold:#facc15; --danger:#f87171;
+    --bg:#070d18; --panel:#0e1727; --panel2:#0b1422; --line:#1b2b44;
+    --text:#e8f2ff; --muted:#7f8fa8; --dim:#55647c;
+    --accent:#22d3ee; --good:#4ade80; --warn:#facc15; --bad:#f87171;
+    --r:16px; --pad:16px;
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0;height:100%;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
   body{
     background:var(--bg); color:var(--text);
-    max-width:520px; margin:0 auto;
-    font-family:-apple-system,"Segoe UI",Roboto,sans-serif;
-    padding:calc(14px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
-    user-select:none;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    font-size:15px; line-height:1.35; -webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bottom));
+    overscroll-behavior-y:contain;
   }
-  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-  h1{font-size:17px;letter-spacing:.14em;margin:0;font-weight:700;}
-  .date{font-size:11px;color:var(--muted);margin-top:3px;}
-  .ring{width:58px;height:58px;position:relative;flex:0 0 auto;}
-  .ring svg{transform:rotate(-90deg);}
-  .ring span{position:absolute;inset:0;display:grid;place-items:center;font-size:12px;font-weight:700;}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;}
-  .row{display:flex;align-items:center;gap:12px;padding:10px 6px;border-radius:10px;}
-  .row:active{background:var(--panel2);}
-  .check{width:26px;height:26px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;}
-  .check svg{width:15px;height:15px;}
-  .name{flex:1;font-size:15px;}
-  .name.done{color:#9fe9f5;}
-  .streak{font-size:12px;font-weight:700;color:var(--gold);}
-  .sub{font-size:11px;color:var(--muted);margin-top:2px;}
-  .empty{color:var(--muted);font-size:13px;text-align:center;padding:22px 6px;line-height:1.5;}
-  .btn{
-    display:block;width:100%;padding:13px;border-radius:12px;border:0;
-    background:var(--accent);color:#06131f;font-weight:700;font-size:14px;margin-top:12px;
+  .wrap{max-width:560px;margin:0 auto;padding:0 var(--pad);}
+  button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;}
+  h1,h2,h3{margin:0;font-weight:700;}
+  .muted{color:var(--muted);}
+  .small{font-size:12px;}
+  .tiny{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:700;}
+
+  header{padding:18px 0 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;}
+  .hello h1{font-size:22px;letter-spacing:-.02em;}
+  .hello .small{margin-top:3px;}
+  .ring{position:relative;width:74px;height:74px;flex:0 0 auto;}
+  .ring svg{display:block;transform:rotate(-90deg);}
+  .ring .pct{position:absolute;inset:0;display:grid;place-items:center;font-size:15px;font-weight:700;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;}
+  .section{margin:18px 0 8px;display:flex;align-items:center;justify-content:space-between;}
+  .section .tiny{letter-spacing:.14em;}
+
+  .habit{
+    display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--r);padding:14px;margin-bottom:10px;transition:transform .12s ease,border-color .12s;
   }
-  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border);}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
-  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:10px 4px;text-align:center;}
-  .stat b{display:block;font-size:16px;}
-  .stat small{color:var(--muted);font-size:9px;letter-spacing:.06em;}
-  .label{font-size:10px;letter-spacing:.14em;color:var(--muted);margin:16px 4px 8px;font-weight:700;}
-  .heat{display:grid;grid-template-columns:repeat(7,minmax(0,34px));gap:6px;justify-content:center;}
-  .cell{aspect-ratio:1;border-radius:6px;background:#141f33;}
-  .cell.on{background:var(--accent);}
-  .cell.today{outline:2px solid var(--accent);outline-offset:1px;}
-  .bars{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;height:96px;grid-auto-rows:1fr;}
-  .bar{background:var(--accent);border-radius:5px 5px 0 0;min-height:3px;opacity:.9;}
-  .bar.off{background:#1a2740;}
-  .barwrap{display:flex;flex-direction:column;justify-content:flex-end;height:100%;min-height:0;}
-  .barwrap small{text-align:center;color:var(--muted);font-size:9px;margin-top:4px;}
-  dialog{
-    border:1px solid var(--border);border-radius:16px;background:var(--panel);
-    color:var(--text);padding:18px;width:min(340px,88vw);
+  .habit:active{transform:scale(.988);}
+  .habit.done{border-color:rgba(34,211,238,.4);}
+  .tick{
+    width:44px;height:44px;flex:0 0 auto;border-radius:14px;display:grid;place-items:center;
+    border:2px solid var(--line);color:var(--muted);font-weight:700;transition:all .15s ease;
   }
-  dialog::backdrop{background:rgba(3,8,16,.7);}
-  input[type=text]{
-    width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);
-    background:var(--panel2);color:var(--text);font-size:15px;outline:none;margin:10px 0 14px;
+  .tick.on{border-color:transparent;color:#04121c;}
+  .tick svg{width:20px;height:20px;}
+  .habit .body{flex:1;min-width:0;}
+  .habit .name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .habit .meta{display:flex;align-items:center;gap:8px;margin-top:3px;color:var(--muted);font-size:11.5px;}
+  .chip{padding:2px 7px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);font-size:10px;
+        letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+  .streak{display:flex;align-items:center;gap:4px;color:var(--warn);font-size:12px;font-weight:700;}
+  .dots{display:flex;gap:4px;margin-top:7px;}
+  .dots i{width:100%;height:4px;border-radius:2px;background:var(--line);}
+  .dots i.on{background:var(--accent);}
+  .dots i.today{box-shadow:0 0 0 1.5px var(--accent);}
+
+  .primary{
+    display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    background:var(--accent);color:#04121c;font-weight:700;padding:14px;border-radius:14px;margin-top:6px;
   }
-  .swatches{display:flex;gap:10px;margin-bottom:14px;}
-  .sw{width:26px;height:26px;border-radius:8px;}
-  .sw.sel{outline:2px solid #fff;outline-offset:2px;}
-  .days{display:flex;gap:6px;}
-  .day{
-    flex:1;text-align:center;padding:9px 0;border-radius:9px;border:1px solid var(--border);
-    font-size:13px;color:var(--muted);
+  .primary:active{filter:brightness(.94);}
+  .ghost{border:1px solid var(--line);border-radius:12px;padding:11px 14px;color:var(--muted);font-weight:600;}
+  .ghost:active{background:var(--panel2);}
+
+  .empty{text-align:center;padding:34px 12px;color:var(--muted);}
+  .empty .big{font-size:34px;margin-bottom:10px;}
+  .empty h3{font-size:16px;color:var(--text);margin-bottom:6px;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;}
+  .kpi b{display:block;font-size:26px;letter-spacing:-.02em;}
+  .kpi span{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;}
+  .ranges{display:flex;gap:8px;margin:14px 0 4px;}
+  .ranges button{flex:1;padding:9px;border-radius:11px;border:1px solid var(--line);color:var(--muted);
+                 font-size:12px;font-weight:700;}
+  .ranges button.on{background:var(--accent);border-color:var(--accent);color:#04121c;}
+  .bars{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:118px;}
+  .barwrap{display:flex;flex-direction:column;justify-content:flex-end;height:100%;min-height:0;gap:5px;}
+  .bar{border-radius:6px 6px 3px 3px;min-height:4px;background:var(--accent);opacity:.9;}
+  .barwrap small{text-align:center;color:var(--dim);font-size:9px;}
+  .row{display:flex;align-items:center;gap:10px;padding:9px 0;}
+  .row+.row{border-top:1px solid var(--line);}
+  .row .lbl{flex:0 0 38%;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .track{flex:1;height:8px;border-radius:5px;background:var(--panel2);overflow:hidden;}
+  .fill{height:100%;border-radius:5px;}
+  .row .val{flex:0 0 42px;text-align:right;font-size:12px;color:var(--muted);}
+
+  .calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .calhead .nav{display:flex;gap:6px;}
+  .calhead .nav button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
+                       display:grid;place-items:center;color:var(--muted);}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .calgrid .wd{text-align:center;font-size:9px;color:var(--dim);padding-bottom:2px;text-transform:uppercase;}
+  .day{aspect-ratio:1;border-radius:10px;background:var(--panel2);display:grid;place-items:center;
+       font-size:11px;color:var(--muted);border:1px solid transparent;}
+  .day.today{border-color:var(--accent);}
+  .day.future{opacity:.35;}
+  .day.pad{background:transparent;}
+  .legend{display:flex;align-items:center;gap:6px;margin-top:12px;color:var(--dim);font-size:10px;}
+  .legend i{width:14px;height:10px;border-radius:3px;display:inline-block;}
+
+  nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:20;
+    background:rgba(14,23,39,.94);
+    border-top:1px solid var(--line);backdrop-filter:blur(14px);
+    padding:8px 8px calc(8px + env(safe-area-inset-bottom));
   }
-  .day.sel{background:var(--accent);color:#06131f;font-weight:700;border-color:var(--accent);}
-  .dialog-actions{display:flex;gap:10px;margin-top:16px;}
-  .dialog-actions button{flex:1;padding:12px;border-radius:11px;border:0;font-weight:700;font-size:14px;}
-  .cancel{background:transparent;color:var(--muted);border:1px solid var(--border)!important;}
-  .save{background:var(--accent);color:#06131f;}
-  .footer{text-align:center;color:var(--muted);font-size:10px;padding:8px 0 96px;}
-  nav#tabs{
-    position:fixed;left:0;right:0;bottom:0;display:flex;
-    background:#0c1524f2;border-top:1px solid var(--border);
-    padding:8px 8px calc(8px + env(safe-area-inset-bottom));gap:6px;backdrop-filter:blur(8px);
+  nav .inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
+  nav button{padding:8px 4px;border-radius:12px;color:var(--dim);display:flex;flex-direction:column;
+             align-items:center;gap:3px;font-size:9.5px;font-weight:700;letter-spacing:.04em;}
+  nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.9;
+                 stroke-linecap:round;stroke-linejoin:round;}
+  nav button.on{color:var(--accent);background:rgba(34,211,238,.12);}
+
+  .backdrop{position:fixed;inset:0;background:rgba(2,6,12,.72);opacity:0;pointer-events:none;
+            transition:opacity .2s ease;z-index:30;backdrop-filter:blur(2px);}
+  .backdrop.show{opacity:1;pointer-events:auto;}
+  .sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--panel);
+    border-radius:22px 22px 0 0;border-top:1px solid var(--line);
+    transform:translateY(102%);transition:transform .26s cubic-bezier(.22,.9,.3,1);
+    max-height:92vh;overflow-y:auto;padding:10px var(--pad) calc(20px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling:touch;
   }
-  nav#tabs button{
-    flex:1;background:transparent;border:0;color:var(--muted);font-size:11px;font-weight:700;
-    letter-spacing:.06em;padding:10px 4px;border-radius:10px;font-family:inherit;
+  .sheet.show{transform:translateY(0);}
+  .sheet .grab{width:36px;height:4px;border-radius:2px;background:var(--line);margin:6px auto 14px;}
+  .sheet h2{font-size:17px;margin-bottom:14px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+               color:var(--dim);font-weight:700;margin-bottom:7px;}
+  input[type=text],input[type=number],textarea{
+    width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+    padding:12px;color:var(--text);font-size:15px;outline:none;font-family:inherit;
   }
-  nav#tabs button.on{color:var(--accent);background:#122238;}
-  .cal-head,.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
-  .cal-head div{text-align:center;color:var(--muted);font-size:9px;padding-bottom:4px;}
-  .cal div{aspect-ratio:1;max-width:38px;width:100%;margin:0 auto;border-radius:8px;background:#141f33;
-           display:grid;place-items:center;font-size:10px;color:#7c8ba6;}
-  .cal div.dim{color:#4a5b76;}
-  .cal div.pad{background:transparent;}
-  .bar-row{display:flex;align-items:center;gap:10px;padding:7px 0;}
-  .bar-name{flex:0 0 40%;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .bar-track{flex:1;height:7px;border-radius:4px;background:#152238;overflow:hidden;}
-  .bar-fill{height:100%;border-radius:4px;}
-  .bar-pct{flex:0 0 42px;text-align:right;font-size:11px;color:var(--muted);}
+  input:focus,textarea:focus{border-color:var(--accent);}
+  .swatches{display:flex;gap:10px;flex-wrap:wrap;}
+  .sw{width:30px;height:30px;border-radius:10px;border:2px solid transparent;}
+  .sw.on{border-color:#fff;}
+  .sw:focus,.sw:focus-visible,.days .d:focus,.seg button:focus{outline:none;}
+  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .days .d{min-width:0;text-align:center;padding:10px 0;border-radius:10px;border:1px solid var(--line);
+           color:var(--muted);font-size:12px;font-weight:700;}
+  .days .d.on{background:var(--accent);border-color:var(--accent);color:#04121c;}
+  .seg{display:flex;gap:8px;}
+  .seg button{flex:1;padding:11px;border-radius:11px;border:1px solid var(--line);color:var(--muted);
+              font-size:13px;font-weight:700;}
+  .seg button.on{background:var(--accent);border-color:var(--accent);color:#04121c;}
+  .sheet-actions{display:flex;gap:10px;margin-top:18px;}
+  .sheet-actions button{flex:1;padding:14px;border-radius:13px;font-weight:700;}
+  .danger{color:var(--bad);border:1px solid rgba(248,113,113,.4);}
+
+  #toast{
+    position:fixed;left:50%;bottom:90px;transform:translate(-50%,20px);z-index:40;
+    background:#132033;border:1px solid var(--line);border-radius:12px;
+    padding:11px 16px;font-size:13px;opacity:0;transition:all .22s ease;pointer-events:none;
+    box-shadow:0 8px 30px rgba(0,0,0,.4);max-width:86vw;text-align:center;
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0);}
 </style>
 </head>
 <body>
-<header>
-  <div>
-    <h1>HABIT TRACKER</h1>
-    <div class="date" id="today"></div>
-  </div>
-  <div class="ring">
-    <svg width="58" height="58">
-      <circle cx="29" cy="29" r="24" fill="none" stroke="#1e2d47" stroke-width="5"></circle>
-      <circle id="ringArc" cx="29" cy="29" r="24" fill="none" stroke="#22d3ee" stroke-width="5"
-              stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="150.8"></circle>
-    </svg>
-    <span id="ringText">0%</span>
-  </div>
-</header>
 
-<main id="page-today">
-  <div class="card" id="listCard"></div>
-  <button class="btn" id="addBtn">+ New habit</button>
-  <div id="detail"></div>
-</main>
-
-<main id="page-stats" hidden>
-  <div class="stats" id="bigStats"></div>
-  <div class="label">DAILY COMPLETION · LAST 30 DAYS</div>
-  <div class="card" style="padding:10px"><svg id="trendChart" viewBox="0 0 320 120" width="100%" height="120"></svg></div>
-  <div class="label">EVERY HABIT</div>
-  <div class="card" id="habitTable"></div>
-</main>
-
-<main id="page-calendar" hidden>
-  <div class="card" style="padding-bottom:18px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <b id="monthLabel" style="font-size:14px"></b>
-      <div style="display:flex;gap:10px;color:var(--accent);font-size:18px">
-        <span id="prevMonth">‹</span><span id="nextMonth">›</span>
-      </div>
+<div class="wrap">
+  <header>
+    <div class="hello">
+      <h1 id="greeting">Good day</h1>
+      <div class="small muted" id="dateLine"></div>
     </div>
-    <div class="cal-head" id="calHead"></div>
-    <div class="cal" id="calGrid"></div>
-  </div>
-  <div class="label">SUCCESS BY WEEKDAY · ALL HABITS</div>
-  <div class="bars" id="globalBars" style="height:110px"></div>
-</main>
+    <div class="ring">
+      <svg width="74" height="74" viewBox="0 0 74 74">
+        <circle cx="37" cy="37" r="31" fill="none" stroke="#1b2b44" stroke-width="6"></circle>
+        <circle id="ringArc" cx="37" cy="37" r="31" fill="none" stroke="#22d3ee" stroke-width="6"
+                stroke-linecap="round" stroke-dasharray="194.8" stroke-dashoffset="194.8"></circle>
+      </svg>
+      <div class="pct" id="ringPct">0%</div>
+    </div>
+  </header>
 
-<nav id="tabs">
-  <button data-page="today" class="on">Today</button>
-  <button data-page="stats">Statistics</button>
-  <button data-page="calendar">Calendar</button>
+  <main id="page-today"></main>
+  <main id="page-stats" hidden></main>
+  <main id="page-calendar" hidden></main>
+  <main id="page-settings" hidden></main>
+</div>
+
+<nav>
+  <div class="inner">
+    <button data-page="today" class="on">
+      <svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>Today</button>
+    <button data-page="stats">
+      <svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Stats</button>
+    <button data-page="calendar">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>Calendar</button>
+    <button data-page="settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>More</button>
+  </div>
 </nav>
-<div class="footer">Tap a habit to select · tap the circle to tick</div>
 
-<dialog id="dlg">
-  <b style="font-size:12px;letter-spacing:.14em;color:var(--accent)">NEW HABIT</b>
-  <input type="text" id="nameInput" placeholder="e.g. Push ups — 30" maxlength="40">
-  <div class="swatches" id="swatches"></div>
-  <div class="days" id="days"></div>
-  <div class="dialog-actions">
-    <button class="cancel" id="cancelBtn">Cancel</button>
-    <button class="save" id="saveBtn">Create</button>
-  </div>
-</dialog>
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet"></div>
+<div id="toast"></div>
 
 <script>
-const KEY = "nexus.habits.v1";
-const PALETTE = ["#22d3ee","#38bdf8","#a78bfa","#f472b6","#facc15","#4ade80","#fb923c"];
-const DAY_LETTERS = ["M","T","W","T","F","S","S"];
+/* =============================================================== constants */
+const STORE_KEY = "nexus.habits.v2";
+const OLD_KEYS = ["nexus.habits.v1"];
+const PALETTE = ["#22d3ee","#38bdf8","#a78bfa","#f472b6","#facc15","#4ade80","#fb923c","#f87171"];
+const CATEGORIES = ["Health","Study","Sport","Work","Home","Mind"];
+const DAYS = ["M","T","W","T","F","S","S"];
 
-let state = load();
-let selectedId = state.habits.length ? state.habits[0].id : null;
+/* ================================================================== helpers */
+const $ = sel => document.querySelector(sel);
+const el = (tag, cls, html) => { const n = document.createElement(tag); if(cls) n.className = cls; if(html!==undefined) n.innerHTML = html; return n; };
+const iso = d => { const p = n => String(n).padStart(2,"0"); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); };
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const addDays = (d,n) => { const c = new Date(d); c.setDate(c.getDate()+n); return c; };
+const todayStr = () => iso(new Date());
+const mondayIndex = d => (d.getDay() + 6) % 7;
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const pct = v => Math.round(v*100);
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
-/* ---------------------------------------------------------------- storage */
-function load(){
+function toast(msg){
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+/* ==================================================================== state */
+let state = loadState();
+let statsRange = 30;
+let calMonth = new Date();
+
+function defaultState(){ return { version: 2, habits: [], settings: { accent:"#22d3ee", name:"" } }; }
+
+function normalise(data){
+  data.settings = Object.assign({ accent:"#22d3ee", name:"" }, data.settings||{});
+  data.habits.forEach(h => {
+    h.schedule = Array.isArray(h.schedule) && h.schedule.length ? h.schedule : [0,1,2,3,4,5,6];
+    h.goal = h.goal || { type:"check", target:1, unit:"" };
+    h.log = h.log || {};
+    h.category = h.category || "Health";
+  });
+  return data;
+}
+
+function loadState(){
   try{
-    const raw = localStorage.getItem(KEY);
-    if(!raw) return {habits:[]};
-    const data = JSON.parse(raw);
-    if(!Array.isArray(data.habits)) return {habits:[]};
-    return data;
-  }catch(e){ return {habits:[]}; }
-}
-function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      const data = JSON.parse(raw);
+      if(data && Array.isArray(data.habits)) return normalise(data);
+    }
+    for(const key of OLD_KEYS){
+      const old = localStorage.getItem(key);
+      if(old) return migrate(JSON.parse(old));
+    }
+  }catch(e){}
+  return defaultState();
 }
 
-/* ------------------------------------------------------------------ dates */
-function iso(d){
-  const p = n => String(n).padStart(2,"0");
-  return d.getFullYear() + "-" + p(d.getMonth()+1) + "-" + p(d.getDate());
+function migrate(old){
+  const data = defaultState();
+  (old.habits||[]).forEach(h => {
+    const log = {};
+    (h.done||[]).forEach(d => { log[d] = 1; });
+    data.habits.push({
+      id: h.id || "h" + Math.random().toString(36).slice(2,10),
+      name: h.name || "Habit",
+      color: h.color || "#22d3ee",
+      category: "Health",
+      schedule: [0,1,2,3,4,5,6],
+      goal: { type:"check", target:1, unit:"" },
+      notes: "",
+      created: h.created || todayStr(),
+      log
+    });
+  });
+  saveState(data);
+  return data;
 }
-function todayStr(){ return iso(new Date()); }
-function addDays(d, n){ const c = new Date(d); c.setDate(c.getDate()+n); return c; }
-function parse(s){ const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); }
 
-/* --------------------------------------------------------------- behaviour */
-function isDone(h, day){ return h.done.includes(day || todayStr()); }
-function toggle(h, day){
+function saveState(data){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(data || state)); }catch(e){}
+}
+
+/* ================================================================ behaviour */
+function valueOn(h, day){ return h.log[day] || 0; }
+function isDone(h, day){ const d = day || todayStr(); return valueOn(h, d) >= ((h.goal && h.goal.target) || 1); }
+function isScheduled(h, day){ return h.schedule.includes(mondayIndex(parse(day))); }
+
+function toggleHabit(h, day){
   day = day || todayStr();
-  const i = h.done.indexOf(day);
-  if(i >= 0) h.done.splice(i,1);
-  else { h.done.push(day); h.done.sort(); }
-  save();
+  const target = (h.goal && h.goal.target) || 1;
+  if(isDone(h, day)) delete h.log[day];
+  else h.log[day] = target;
+  saveState();
 }
+
 function streak(h){
-  let count = 0;
-  let cursor = new Date();
+  let n = 0, cursor = new Date();
   if(!isDone(h, iso(cursor))) cursor = addDays(cursor, -1);
-  while(isDone(h, iso(cursor))){ count++; cursor = addDays(cursor, -1); }
-  return count;
+  while(isDone(h, iso(cursor))){ n++; cursor = addDays(cursor, -1); }
+  return n;
 }
+
 function bestStreak(h){
-  if(!h.done.length) return 0;
-  const days = [...new Set(h.done)].sort();
+  const days = Object.keys(h.log).filter(d => isDone(h, d)).sort();
+  if(!days.length) return 0;
   let best = 1, run = 1;
   for(let i=1;i<days.length;i++){
     const diff = Math.round((parse(days[i]) - parse(days[i-1])) / 86400000);
@@ -220,410 +324,669 @@ function bestStreak(h){
   }
   return best;
 }
-function weekDone(h){
-  let n = 0;
-  const now = new Date();
-  for(let i=0;i<7;i++) if(isDone(h, iso(addDays(now, -i)))) n++;
-  return n;
-}
-function completionRate(h, windowDays=30){
+
+function rate(h, windowDays){
   const end = new Date();
-  const created = parse(h.created);
   let start = addDays(end, -(windowDays-1));
+  const created = parse(h.created);
   if(created > start) start = created;
-  const span = Math.round((end - start)/86400000) + 1;
-  if(span <= 0) return 0;
-  let hits = 0;
-  for(let i=0;i<span;i++) if(isDone(h, iso(addDays(end, -i)))) hits++;
-  return hits/span;
-}
-
-/* ----------------------------------------------------------------- render */
-function render(){
-  const t = new Date();
-  document.getElementById("today").textContent =
-    t.toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long", year:"numeric"});
-
-  renderRing();
-  renderList();
-  renderDetail();
-}
-
-function renderRing(){
-  const total = state.habits.length;
-  const done = state.habits.filter(h => isDone(h)).length;
-  const share = total ? done/total : 0;
-  const circumference = 2 * Math.PI * 24;
-  const arc = document.getElementById("ringArc");
-  arc.setAttribute("stroke-dasharray", circumference.toFixed(1));
-  arc.setAttribute("stroke-dashoffset", (circumference * (1 - share)).toFixed(1));
-  document.getElementById("ringText").textContent = Math.round(share*100) + "%";
-}
-
-function renderList(){
-  const card = document.getElementById("listCard");
-  card.innerHTML = "";
-  if(!state.habits.length){
-    card.innerHTML = '<div class="empty">Nothing here yet.<br>Press “+ New habit” to begin.</div>';
-    return;
+  let total = 0, hits = 0;
+  for(let d = new Date(start); d <= end; d = addDays(d,1)){
+    const key = iso(d);
+    if(!isScheduled(h, key)) continue;
+    total++;
+    if(isDone(h, key)) hits++;
   }
-  state.habits.forEach(h => {
-    const done = isDone(h);
-    const row = document.createElement("div");
-    row.className = "row";
-    row.innerHTML = `
-      <div class="check" style="background:${done ? h.color : 'transparent'};
-           border:2px solid ${done ? h.color : h.color + '66'}">
-        ${done ? '<svg viewBox="0 0 24 24" fill="none" stroke="#06131f" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>' : ''}
-      </div>
-      <div style="flex:1">
-        <div class="name ${done?'done':''}">${escapeHtml(h.name)}</div>
-        <div class="sub">${weekDone(h)}/7 this week</div>
-      </div>
-      <div class="streak">${streak(h) ? streak(h) + "d" : ""}</div>`;
-
-    row.querySelector(".check").addEventListener("click", ev => {
-      ev.stopPropagation();
-      toggle(h);
-      selectedId = h.id;
-      render();
-    });
-    row.addEventListener("click", () => { selectedId = h.id; render(); });
-    card.appendChild(row);
-  });
+  return total ? hits/total : 0;
 }
 
-function renderDetail(){
-  const host = document.getElementById("detail");
-  const h = state.habits.find(x => x.id === selectedId);
-  host.innerHTML = "";
-  if(!h) return;
+function scheduledToday(){ return state.habits.filter(h => isScheduled(h, todayStr())); }
 
-  const stats = document.createElement("div");
-  stats.className = "stats";
-  stats.innerHTML = `
-    <div class="stat"><b style="color:var(--accent)">${streak(h)}</b><small>STREAK</small></div>
-    <div class="stat"><b>${bestStreak(h)}</b><small>BEST</small></div>
-    <div class="stat"><b>${weekDone(h)}/7</b><small>WEEK</small></div>
-    <div class="stat"><b>${Math.round(completionRate(h)*100)}%</b><small>30 DAYS</small></div>`;
-  host.appendChild(stats);
-
-  const head = document.createElement("div");
-  head.className = "card";
-  head.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <div style="font-size:16px;font-weight:700">${escapeHtml(h.name)}</div>
-      <div id="editBtn" style="font-size:12px;color:var(--accent);border:1px solid var(--border);
-           border-radius:9px;padding:6px 10px">Edit</div></div>
-    <div class="sub" style="margin-top:4px">Started ${parse(h.created).toLocaleDateString(undefined,
-      {day:"numeric", month:"short", year:"numeric"})} · target ${h.target} days a week</div>`;
-  host.appendChild(head);
-  document.getElementById("editBtn").addEventListener("click", () => {
-    document.getElementById("nameInput").value = h.name;
-    draftColour = h.color;
-    draftTarget = h.target;
-    editing = h;
-    buildDialog();
-    document.querySelector("#dlg b").textContent = "EDIT HABIT";
-    document.getElementById("saveBtn").textContent = "Save";
-    document.getElementById("dlg").showModal();
-  });
-
-  const heatLabel = document.createElement("div");
-  heatLabel.className = "label";
-  heatLabel.textContent = "LAST 5 WEEKS";
-  host.appendChild(heatLabel);
-
-  const heat = document.createElement("div");
-  heat.className = "heat";
-  const end = new Date();
-  for(let i=34;i>=0;i--){
-    const day = addDays(end, -i);
-    const key = iso(day);
-    const cell = document.createElement("div");
-    cell.className = "cell" + (isDone(h,key) ? " on" : "") + (key === todayStr() ? " today" : "");
-    if(isDone(h,key)) cell.style.background = h.color;
-    cell.title = key;
-    cell.addEventListener("click", () => { toggle(h, key); render(); });
-    heat.appendChild(cell);
-  }
-  host.appendChild(heat);
-
-  const barLabel = document.createElement("div");
-  barLabel.className = "label";
-  barLabel.textContent = "SUCCESS BY WEEKDAY";
-  host.appendChild(barLabel);
-
-  const bars = document.createElement("div");
-  bars.className = "bars";
-  const totals = new Array(7).fill(0), hits = new Array(7).fill(0);
-  let cursor = parse(h.created);
-  const stop = new Date();
-  while(cursor <= stop){
-    const idx = (cursor.getDay() + 6) % 7;
-    totals[idx]++;
-    if(isDone(h, iso(cursor))) hits[idx]++;
-    cursor = addDays(cursor, 1);
-  }
-  for(let i=0;i<7;i++){
-    const rate = totals[i] ? hits[i]/totals[i] : 0;
-    const wrap = document.createElement("div");
-    wrap.className = "barwrap";
-    wrap.innerHTML = `<div class="bar ${rate?'':'off'}" style="height:${Math.max(3, rate*86)}px;
-      ${rate?'':'background:#1a2740'}"></div><small>${DAY_LETTERS[i]}</small>`;
-    bars.appendChild(wrap);
-  }
-  host.appendChild(bars);
-
-  const actions = document.createElement("div");
-  actions.style.display = "flex";
-  actions.style.gap = "10px";
-  actions.innerHTML = `
-    <button class="btn ghost" id="deleteBtn" style="color:var(--danger)">Delete habit</button>`;
-  host.appendChild(actions);
-  document.getElementById("deleteBtn").addEventListener("click", () => {
-    if(!confirm("Delete “" + h.name + "” and all of its history?")) return;
-    const index = state.habits.findIndex(x => x.id === h.id);
-    const removed = state.habits.splice(index, 1)[0];
-    selectedId = state.habits.length ? state.habits[0].id : null;
-    save(); render();
-    const bar = document.createElement("div");
-    bar.style.cssText = "position:fixed;left:12px;right:12px;bottom:18px;background:#101a2e;border:1px solid #1e2d47;border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;z-index:9";
-    bar.innerHTML = '<span>Deleted “' + escapeHtml(removed.name) + '”</span><b style="color:var(--accent)">UNDO</b>';
-    bar.querySelector("b").addEventListener("click", () => {
-      state.habits.splice(index, 0, removed);
-      selectedId = removed.id;
-      save(); render(); bar.remove();
-    });
-    document.body.appendChild(bar);
-    setTimeout(() => bar.remove(), 6000);
-  });
-}
-
-function escapeHtml(s){
-  return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-}
-
-/* ------------------------------------------------------------------- new ---*/
-let draftColour = PALETTE[0];
-let draftTarget = 7;
-let editing = null;
-
-function buildDialog(){
-  const sw = document.getElementById("swatches");
-  sw.innerHTML = "";
-  PALETTE.forEach(c => {
-    const el = document.createElement("div");
-    el.className = "sw" + (c === draftColour ? " sel" : "");
-    el.style.background = c;
-    el.addEventListener("click", () => { draftColour = c; buildDialog(); });
-    sw.appendChild(el);
-  });
-  const days = document.getElementById("days");
-  days.innerHTML = "";
-  for(let n=1;n<=7;n++){
-    const el = document.createElement("div");
-    el.className = "day" + (n === draftTarget ? " sel" : "");
-    el.textContent = n;
-    el.addEventListener("click", () => { draftTarget = n; buildDialog(); });
-    days.appendChild(el);
-  }
-}
-
-document.getElementById("addBtn").addEventListener("click", () => {
-  editing = null;
-  document.getElementById("nameInput").value = "";
-  draftColour = PALETTE[Math.floor(Math.random()*PALETTE.length)];
-  draftTarget = 7;
-  document.querySelector("#dlg b").textContent = "NEW HABIT";
-  document.getElementById("saveBtn").textContent = "Create";
-  buildDialog();
-  document.getElementById("dlg").showModal();
-});
-document.getElementById("cancelBtn").addEventListener("click", () => document.getElementById("dlg").close());
-document.getElementById("saveBtn").addEventListener("click", () => {
-  const name = document.getElementById("nameInput").value.trim();
-  if(!name) return;
-  if(editing){
-    editing.name = name;
-    editing.color = draftColour;
-    editing.target = draftTarget;
-    selectedId = editing.id;
-    editing = null;
-    save();
-    document.getElementById("dlg").close();
-    render();
-    return;
-  }
-  const habit = {
-    id: Date.now().toString(36),
-    name, color: draftColour, target: draftTarget,
-    created: todayStr(), done: []
-  };
-  state.habits.push(habit);
-  selectedId = habit.id;
-  save();
-  document.getElementById("dlg").close();
-  render();
-});
-
-/* ------------------------------------------------------------------ pages */
-function switchPage(name){
-  ["today","stats","calendar"].forEach(p => {
-    document.getElementById("page-" + p).hidden = (p !== name);
-  });
-  document.querySelectorAll("#tabs button").forEach(b => {
-    b.classList.toggle("on", b.dataset.page === name);
-  });
-  document.querySelector(".footer").style.visibility = (name === "today") ? "visible" : "hidden";
-  if(name === "stats") renderStats();
-  if(name === "calendar") renderCalendar();
-  window.scrollTo(0,0);
-}
-document.querySelectorAll("#tabs button").forEach(b => {
-  b.addEventListener("click", () => switchPage(b.dataset.page));
-});
-
-/* ------------------------------------------------------------- statistics */
-function habitsOn(day){
-  return state.habits.filter(h => h.created <= day);
-}
-function dayCompletion(day){
-  const list = habitsOn(day);
+function dayScore(day){
+  const list = state.habits.filter(h => isScheduled(h, day) && h.created <= day);
   if(!list.length) return null;
-  return list.filter(h => h.done.includes(day)).length / list.length;
+  return list.filter(h => isDone(h, day)).length / list.length;
 }
-function series(days){
-  const out = [];
-  const now = new Date();
-  for(let i=days-1;i>=0;i--){
-    const d = iso(addDays(now, -i));
-    out.push({day:d, pct: dayCompletion(d)});
+
+/* =============================================================== rendering */
+function renderAll(){
+  document.documentElement.style.setProperty("--accent", state.settings.accent || "#22d3ee");
+  renderHeader();
+  renderToday();
+  if(!$("#page-stats").hidden) renderStats();
+  if(!$("#page-calendar").hidden) renderCalendar();
+  if(!$("#page-settings").hidden) renderSettings();
+}
+
+function renderHeader(){
+  const hour = new Date().getHours();
+  const part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  $("#greeting").textContent = part + (state.settings.name ? ", " + state.settings.name : "");
+  $("#dateLine").textContent = new Date().toLocaleDateString(undefined,
+    {weekday:"long", day:"numeric", month:"long"});
+
+  const list = scheduledToday();
+  const done = list.filter(h => isDone(h)).length;
+  const share = list.length ? done/list.length : 0;
+  const c = 2 * Math.PI * 31;
+  const arc = $("#ringArc");
+  arc.setAttribute("stroke-dasharray", c.toFixed(1));
+  arc.setAttribute("stroke-dashoffset", (c * (1 - share)).toFixed(1));
+  arc.setAttribute("stroke", state.settings.accent || "#22d3ee");
+  $("#ringPct").textContent = pct(share) + "%";
+}
+
+function renderToday(){
+  const host = $("#page-today");
+  host.innerHTML = "";
+
+  if(!state.habits.length){
+    const empty = el("div", "empty");
+    empty.innerHTML = `<div class="big">◐</div><h3>No habits yet</h3>
+      <div class="small">Add the first one — something small enough that you cannot talk yourself out of it.</div>`;
+    host.appendChild(empty);
+    const btn = el("button", "primary", "＋ New habit");
+    btn.addEventListener("click", () => openHabitSheet());
+    host.appendChild(btn);
+    return;
   }
-  return out;
+
+  const scheduled = scheduledToday();
+  const doneList = scheduled.filter(h => isDone(h));
+  const todoList = scheduled.filter(h => !isDone(h));
+
+  if(scheduled.length){
+    const t = el("div", "section");
+    t.innerHTML = `<span class="tiny">To do · ${todoList.length}</span>`;
+    host.appendChild(t);
+    if(todoList.length === 0){
+      const doneAll = el("div", "card");
+      doneAll.style.textAlign = "center";
+      doneAll.innerHTML = `<div style="font-size:26px">✓</div>
+        <div style="margin-top:6px;font-weight:600">Everything done for today</div>
+        <div class="small muted" style="margin-top:2px">Rest is part of the routine.</div>`;
+      host.appendChild(doneAll);
+    }
+    todoList.forEach(h => host.appendChild(habitCard(h)));
+  }
+
+  if(doneList.length){
+    const t = el("div", "section");
+    t.innerHTML = `<span class="tiny">Completed · ${doneList.length}</span>`;
+    host.appendChild(t);
+    doneList.forEach(h => host.appendChild(habitCard(h)));
+  }
+
+  const rest = state.habits.filter(h => !isScheduled(h, todayStr()));
+  if(rest.length){
+    const t = el("div", "section");
+    t.innerHTML = `<span class="tiny">Not scheduled today · ${rest.length}</span>`;
+    host.appendChild(t);
+    rest.forEach(h => host.appendChild(habitCard(h, true)));
+  }
+
+  const add = el("button", "primary", "＋ New habit");
+  add.style.marginTop = "14px";
+  add.addEventListener("click", () => openHabitSheet());
+  host.appendChild(add);
 }
+
+function habitCard(h, dim){
+  const done = isDone(h);
+  const card = el("div", "habit" + (done ? " done" : ""));
+  if(dim) card.style.opacity = ".62";
+
+  const tick = el("button", "tick" + (done ? " on" : ""));
+  tick.style.background = done ? h.color : "transparent";
+  tick.innerHTML = done
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>'
+    : (h.goal.type === "count" ? `<span>${valueOn(h, todayStr())}</span>` : "");
+  tick.addEventListener("click", ev => {
+    ev.stopPropagation();
+    if(h.goal.type === "count"){ openCountSheet(h); return; }
+    toggleHabit(h);
+    renderAll();
+    toast(isDone(h) ? "Done — keep it going" : "Cleared");
+  });
+
+  const body = el("div", "body");
+  const meta = h.goal.type === "count"
+    ? `${valueOn(h, todayStr())} / ${h.goal.target} ${h.goal.unit || "times"}`
+    : (done ? "Completed today" : "Tap to mark done");
+  body.innerHTML = `
+    <div class="name">${escapeHtml(h.name)}</div>
+    <div class="meta"><span class="chip" style="color:${h.color};border-color:${h.color}44">${escapeHtml(h.category)}</span>
+      <span>${meta}</span></div>`;
+
+  const dots = el("div", "dots");
+  for(let i=0;i<7;i++){
+    const day = iso(addDays(new Date(), i - mondayIndex(new Date())));
+    dots.appendChild(el("i", (isScheduled(h, day) ? "on" : "") + (day === todayStr() ? " today" : "")));
+  }
+  body.appendChild(dots);
+
+  const side = el("div");
+  const s = streak(h);
+  side.innerHTML = s ? `<div class="streak">🔥 ${s}</div>` : `<div class="tiny">—</div>`;
+
+  card.appendChild(tick);
+  card.appendChild(body);
+  card.appendChild(side);
+  card.addEventListener("click", () => openHabitSheet(h));
+  return card;
+}
+
+/* ------------------------------------------------------------------- stats */
 function renderStats(){
-  const all = state.habits;
-  const totalTicks = all.reduce((n,h) => n + h.done.length, 0);
-  const activeStreaks = all.map(streak).filter(Boolean);
-  const bestNow = activeStreaks.length ? Math.max(...activeStreaks) : 0;
-  const bestEver = all.length ? Math.max(...all.map(bestStreak)) : 0;
-  const last30 = series(30).filter(p => p.pct !== null);
-  const avg30 = last30.length ? last30.reduce((n,p) => n + p.pct, 0) / last30.length : 0;
+  const host = $("#page-stats");
+  host.innerHTML = "";
 
-  document.getElementById("bigStats").innerHTML = `
-    <div class="stat"><b style="color:var(--accent)">${totalTicks}</b><small>TICKS</small></div>
-    <div class="stat"><b>${bestNow}</b><small>STREAK</small></div>
-    <div class="stat"><b>${bestEver}</b><small>BEST</small></div>
-    <div class="stat"><b>${Math.round(avg30*100)}%</b><small>30 DAYS</small></div>`;
+  const overall = state.habits.length
+    ? state.habits.reduce((n,h) => n + rate(h, statsRange), 0) / state.habits.length
+    : 0;
+  const bestNow = state.habits.length ? Math.max(...state.habits.map(streak)) : 0;
+  const bestEver = state.habits.length ? Math.max(...state.habits.map(bestStreak)) : 0;
+  const ticks = state.habits.reduce((n,h) => n + Object.keys(h.log).length, 0);
 
-  // ---- trend line (SVG) ----
-  const svg = document.getElementById("trendChart");
-  const w = 320, h = 120, pad = 6;
-  const pts = last30.map((p,i) => {
-    const x = pad + (i * (w - pad*2) / Math.max(1, last30.length-1));
-    const y = h - pad - (p.pct || 0) * (h - pad*2);
+  const ranges = el("div", "ranges");
+  [7,30,90].forEach(days => {
+    const b = el("button", statsRange === days ? "on" : "", days + " days");
+    b.addEventListener("click", () => { statsRange = days; renderStats(); });
+    ranges.appendChild(b);
+  });
+  host.appendChild(ranges);
+
+  const grid = el("div", "grid2");
+  grid.style.marginTop = "10px";
+  grid.innerHTML = `
+    <div class="kpi"><b style="color:var(--accent)">${pct(overall)}%</b><span>Completion</span></div>
+    <div class="kpi"><b>${bestNow}</b><span>Current streak</span></div>
+    <div class="kpi"><b>${bestEver}</b><span>Best streak</span></div>
+    <div class="kpi"><b>${ticks}</b><span>Total ticks</span></div>`;
+  host.appendChild(grid);
+
+  host.appendChild(sectionTitle("Daily completion"));
+  host.appendChild(trendChart(statsRange));
+  host.appendChild(sectionTitle("By weekday"));
+  host.appendChild(weekdayChart());
+  host.appendChild(sectionTitle("Every habit"));
+
+  const card = el("div", "card");
+  if(!state.habits.length){
+    card.innerHTML = '<div class="small muted">Nothing yet.</div>';
+  }else{
+    state.habits.slice()
+      .sort((a,b) => rate(b, statsRange) - rate(a, statsRange))
+      .forEach(h => {
+        const row = el("div", "row");
+        row.innerHTML = `<div class="lbl">${escapeHtml(h.name)}</div>
+          <div class="track"><div class="fill" style="width:${pct(rate(h,statsRange))}%;background:${h.color}"></div></div>
+          <div class="val">${pct(rate(h,statsRange))}%</div>`;
+        card.appendChild(row);
+      });
+  }
+  host.appendChild(card);
+}
+
+function sectionTitle(text){
+  const t = el("div", "section");
+  t.innerHTML = `<span class="tiny">${text}</span>`;
+  return t;
+}
+
+function trendChart(days){
+  const card = el("div", "card");
+  const series = [];
+  for(let i=days-1;i>=0;i--) series.push(dayScore(iso(addDays(new Date(), -i))));
+  const w = 320, h = 110, pad = 8;
+  const pts = series.map((v,i) => {
+    const x = pad + i * (w - pad*2) / Math.max(1, series.length-1);
+    const y = h - pad - (v || 0) * (h - pad*2);
     return [x,y];
   });
   let path = "";
-  pts.forEach((p,i) => { path += (i ? " L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); });
-  const area = path + ` L ${pts.length ? pts[pts.length-1][0].toFixed(1) : pad} ${h-pad} L ${pad} ${h-pad} Z`;
-  svg.innerHTML = `
-    <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#22d3ee" stop-opacity=".35"/>
-      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
-    </linearGradient></defs>
-    <path d="${area}" fill="url(#g1)"></path>
-    <path d="${path}" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linejoin="round"></path>
-    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#1e2d47"></line>`;
-
-  // ---- per-habit bars ----
-  const table = document.getElementById("habitTable");
-  table.innerHTML = "";
-  if(!state.habits.length){
-    table.innerHTML = '<div class="empty">No habits yet.</div>';
-    return;
-  }
-  state.habits.forEach(h => {
-    const pct = Math.round(completionRate(h) * 100);
-    const row = document.createElement("div");
-    row.className = "bar-row";
-    row.innerHTML = `<div class="bar-name">${escapeHtml(h.name)}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${h.color}"></div></div>
-      <div class="bar-pct">${pct}%</div>`;
-    table.appendChild(row);
-  });
+  pts.forEach((p,i) => path += (i ? " L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1));
+  const area = path + ` L ${w-pad} ${h-pad} L ${pad} ${h-pad} Z`;
+  card.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">
+    <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--accent)" stop-opacity=".35"/>
+      <stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    <path d="${area}" fill="url(#tg)"></path>
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"></path>
+    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="var(--line)"></line>
+  </svg>`;
+  return card;
 }
 
-/* --------------------------------------------------------------- calendar */
-let calMonth = new Date();
-function renderCalendar(){
-  const label = document.getElementById("monthLabel");
-  const head = document.getElementById("calHead");
-  const grid = document.getElementById("calGrid");
-  const year = calMonth.getFullYear(), month = calMonth.getMonth();
-  label.textContent = calMonth.toLocaleDateString(undefined,{month:"long", year:"numeric"});
-
-  head.innerHTML = DAY_LETTERS.map(d => `<div>${d}</div>`).join("");
-
-  const first = new Date(year, month, 1);
-  const offset = (first.getDay() + 6) % 7;          // Monday-first
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  grid.innerHTML = "";
-  for(let i=0;i<offset;i++){
-    const pad = document.createElement("div");
-    pad.className = "pad";
-    grid.appendChild(pad);
-  }
-  for(let d=1; d<=daysInMonth; d++){
-    const key = iso(new Date(year, month, d));
-    const pct = dayCompletion(key) || 0;
-    const cell = document.createElement("div");
-    cell.textContent = d;
-    cell.title = key + " · " + Math.round(pct*100) + "%";
-    if(pct > 0){
-      cell.style.background = "rgba(34,211,238," + (0.18 + pct*0.82).toFixed(2) + ")";
-      cell.style.color = pct > 0.5 ? "#06131f" : "#cdeefb";
-    } else if(key > todayStr()){
-      cell.className = "dim";
-      cell.style.opacity = ".35";
-    }
-    grid.appendChild(cell);
-  }
-
-  // overall weekday performance
+function weekdayChart(){
   const totals = new Array(7).fill(0), hits = new Array(7).fill(0);
   state.habits.forEach(h => {
-    let cursor = parse(h.created);
-    const stop = new Date();
-    while(cursor <= stop){
-      const idx = (cursor.getDay() + 6) % 7;
+    for(let d = parse(h.created); d <= new Date(); d = addDays(d,1)){
+      const key = iso(d);
+      if(!isScheduled(h,key)) continue;
+      const idx = mondayIndex(d);
       totals[idx]++;
-      if(h.done.includes(iso(cursor))) hits[idx]++;
-      cursor = addDays(cursor, 1);
+      if(isDone(h,key)) hits[idx]++;
     }
   });
-  const bars = document.getElementById("globalBars");
-  bars.innerHTML = "";
+  const card = el("div", "card");
+  const bars = el("div", "bars");
   for(let i=0;i<7;i++){
-    const rate = totals[i] ? hits[i]/totals[i] : 0;
-    const wrap = document.createElement("div");
-    wrap.className = "barwrap";
-    wrap.innerHTML = `<div class="bar" style="height:${Math.max(3, rate*80)}px;
-       ${rate?'':'background:#1a2740'}"></div><small>${DAY_LETTERS[i]}</small>`;
+    const v = totals[i] ? hits[i]/totals[i] : 0;
+    const wrap = el("div", "barwrap");
+    wrap.innerHTML = `<div class="bar" style="height:${6 + v*92}px;${v?'':'background:var(--line)'}"></div>
+      <small>${DAYS[i]}</small>`;
     bars.appendChild(wrap);
   }
+  card.appendChild(bars);
+  return card;
 }
-document.getElementById("prevMonth").addEventListener("click", () => {
-  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()-1, 1);
-  renderCalendar();
-});
-document.getElementById("nextMonth").addEventListener("click", () => {
-  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 1);
-  renderCalendar();
+
+/* ---------------------------------------------------------------- calendar */
+function renderCalendar(){
+  const host = $("#page-calendar");
+  host.innerHTML = "";
+
+  const card = el("div", "card");
+  const head = el("div", "calhead");
+  head.innerHTML = `<b style="font-size:16px">${calMonth.toLocaleDateString(undefined,{month:"long",year:"numeric"})}</b>
+    <div class="nav"><button id="prevM">‹</button><button id="nextM">›</button></div>`;
+  card.appendChild(head);
+
+  const grid = el("div", "calgrid");
+  DAYS.forEach(d => grid.appendChild(el("div", "wd", d)));
+
+  const year = calMonth.getFullYear(), month = calMonth.getMonth();
+  const offset = mondayIndex(new Date(year, month, 1));
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+
+  for(let i=0;i<offset;i++) grid.appendChild(el("div", "day pad"));
+  for(let d=1; d<=daysInMonth; d++){
+    const key = iso(new Date(year, month, d));
+    const score = dayScore(key);
+    const cell = el("div", "day", String(d));
+    if(key === todayStr()) cell.classList.add("today");
+    if(key > todayStr()) cell.classList.add("future");
+    if(score) cell.style.background = `rgba(34,211,238,${(0.14 + score*0.78).toFixed(2)})`;
+    if(score && score > .55) cell.style.color = "#04121c";
+    cell.addEventListener("click", () => openDaySheet(key));
+    grid.appendChild(cell);
+  }
+  card.appendChild(grid);
+
+  const legend = el("div", "legend");
+  legend.innerHTML = `<span>none</span>
+    <i style="background:rgba(34,211,238,.14)"></i>
+    <i style="background:rgba(34,211,238,.45)"></i>
+    <i style="background:rgba(34,211,238,.75)"></i>
+    <i style="background:rgba(34,211,238,.95)"></i><span>all</span>`;
+  card.appendChild(legend);
+  host.appendChild(card);
+
+  head.querySelector("#prevM").addEventListener("click", () => {
+    calMonth = new Date(year, month-1, 1); renderCalendar();
+  });
+  head.querySelector("#nextM").addEventListener("click", () => {
+    calMonth = new Date(year, month+1, 1); renderCalendar();
+  });
+}
+
+/* ---------------------------------------------------------------- settings */
+function renderSettings(){
+  const host = $("#page-settings");
+  host.innerHTML = "";
+
+  const profile = el("div", "card");
+  profile.innerHTML = `<div class="field" style="margin-bottom:0">
+      <label>Your name (used in the greeting)</label>
+      <input type="text" id="nameInput" placeholder="optional" value="${escapeHtml(state.settings.name||"")}">
+    </div>`;
+  host.appendChild(profile);
+  profile.querySelector("#nameInput").addEventListener("change", e => {
+    state.settings.name = e.target.value.trim();
+    saveState(); renderHeader(); toast("Saved");
+  });
+
+  const accent = el("div", "card");
+  accent.style.marginTop = "12px";
+  accent.innerHTML = `<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:700;margin-bottom:10px">Accent colour</div>`;
+  const sw = el("div", "swatches");
+  PALETTE.forEach(c => {
+    const b = el("button", "sw" + (state.settings.accent === c ? " on" : ""));
+    b.style.background = c;
+    b.addEventListener("click", () => { state.settings.accent = c; saveState(); renderAll(); });
+    sw.appendChild(b);
+  });
+  accent.appendChild(sw);
+  host.appendChild(accent);
+
+  const data = el("div", "card");
+  data.style.marginTop = "12px";
+  data.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Your data</div>
+    <div class="small muted">${state.habits.length} habits · ${state.habits.reduce((n,h)=>n+Object.keys(h.log).length,0)} ticks recorded</div>`;
+  const row = el("div");
+  row.style.cssText = "display:flex;gap:10px;margin-top:12px";
+  row.innerHTML = `<button class="ghost" id="exportBtn" style="flex:1">Export backup</button>
+                   <button class="ghost" id="importBtn" style="flex:1">Import</button>`;
+  data.appendChild(row);
+  const reset = el("button", "ghost danger");
+  reset.textContent = "Erase everything";
+  reset.style.cssText = "width:100%;margin-top:10px";
+  data.appendChild(reset);
+  host.appendChild(data);
+
+  data.querySelector("#exportBtn").addEventListener("click", exportData);
+  data.querySelector("#importBtn").addEventListener("click", importData);
+  reset.addEventListener("click", () => {
+    if(confirm("Erase all habits and history? This cannot be undone.")){
+      state = defaultState();
+      localStorage.removeItem(STORE_KEY);
+      saveState();
+      renderAll();
+      toast("Everything erased");
+    }
+  });
+
+  const about = el("div", "card");
+  about.style.marginTop = "12px";
+  about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
+    <div class="small muted" style="margin-top:4px">Version 3.0 · offline, no account, no tracking.
+    Your habits live only on this device.</div>`;
+  host.appendChild(about);
+}
+
+function exportData(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "habits-backup-" + todayStr() + ".json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast("Backup downloaded");
+}
+
+function importData(){
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.addEventListener("change", () => {
+    const file = input.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const data = JSON.parse(reader.result);
+        if(!data || !Array.isArray(data.habits)) throw new Error("bad file");
+        state = normalise(data);
+        saveState();
+        renderAll();
+        toast("Backup restored");
+      }catch(e){ toast("That file is not a valid backup"); }
+    };
+    reader.readAsText(file);
+  });
+  input.click();
+}
+
+/* ------------------------------------------------------------------ sheets */
+function openSheet(build){
+  const sheet = $("#sheet");
+  sheet.innerHTML = '<div class="grab"></div>';
+  build(sheet);
+  sheet.scrollTop = 0;
+  sheet.classList.add("show");
+  $("#backdrop").classList.add("show");
+}
+function closeSheet(){
+  $("#sheet").classList.remove("show");
+  $("#backdrop").classList.remove("show");
+}
+$("#backdrop").addEventListener("click", closeSheet);
+
+function openHabitSheet(habit){
+  const draft = habit ? JSON.parse(JSON.stringify(habit)) : {
+    id: "h" + Date.now().toString(36),
+    name: "", color: PALETTE[Math.floor(Math.random()*PALETTE.length)],
+    category: "Health", schedule: [0,1,2,3,4,5,6],
+    goal: { type:"check", target:1, unit:"" },
+    notes: "", created: todayStr(), log: {}
+  };
+
+  openSheet(sheet => {
+    sheet.appendChild(el("h2", "", habit ? "Edit habit" : "New habit"));
+
+    const nameField = el("div", "field");
+    nameField.innerHTML = `<label>Name</label><input type="text" id="hName" maxlength="42"
+      placeholder="e.g. Push ups — 30" value="${escapeHtml(draft.name)}">`;
+    sheet.appendChild(nameField);
+
+    const daysField = el("div", "field");
+    daysField.innerHTML = `<label>Repeat on</label>`;
+    const daysWrap = el("div", "days");
+    DAYS.forEach((d,i) => {
+      const b = el("button", "d" + (draft.schedule.includes(i) ? " on" : ""), d);
+      b.addEventListener("click", () => {
+        if(draft.schedule.includes(i)) draft.schedule = draft.schedule.filter(x => x !== i);
+        else draft.schedule = [...draft.schedule, i].sort((a,b)=>a-b);
+        b.classList.toggle("on");
+      });
+      daysWrap.appendChild(b);
+    });
+    daysField.appendChild(daysWrap);
+    sheet.appendChild(daysField);
+
+    const goalField = el("div", "field");
+    goalField.innerHTML = `<label>Goal</label>`;
+    const seg = el("div", "seg");
+    const btnCheck = el("button", draft.goal.type !== "count" ? "on" : "", "Yes / no");
+    const btnCount = el("button", draft.goal.type === "count" ? "on" : "", "Count");
+    seg.appendChild(btnCheck); seg.appendChild(btnCount);
+    goalField.appendChild(seg);
+
+    const countWrap = el("div");
+    countWrap.style.cssText = "display:flex;gap:10px;margin-top:10px;" +
+      (draft.goal.type === "count" ? "" : "display:none");
+    countWrap.innerHTML = `<input type="number" id="hTarget" min="1" max="99" value="${draft.goal.target||3}" style="flex:0 0 90px">
+      <input type="text" id="hUnit" placeholder="times" value="${escapeHtml(draft.goal.unit||"")}" style="flex:1">`;
+    goalField.appendChild(countWrap);
+
+    btnCheck.addEventListener("click", () => {
+      draft.goal.type = "check"; draft.goal.target = 1;
+      btnCheck.classList.add("on"); btnCount.classList.remove("on");
+      countWrap.style.display = "none";
+    });
+    btnCount.addEventListener("click", () => {
+      draft.goal.type = "count";
+      if(!draft.goal.target || draft.goal.target < 2) draft.goal.target = 8;
+      sheet.querySelector("#hTarget").value = draft.goal.target;
+      btnCount.classList.add("on"); btnCheck.classList.remove("on");
+      countWrap.style.display = "flex";
+    });
+    sheet.appendChild(goalField);
+
+    const catField = el("div", "field");
+    catField.innerHTML = `<label>Category</label>`;
+    const catWrap = el("div", "swatches");
+    CATEGORIES.forEach(c => {
+      const b = el("button", "ghost", c);
+      const base = "flex:0 0 auto;padding:8px 12px;font-size:12px;";
+      b.style.cssText = base + (draft.category === c ? "border-color:var(--accent);color:var(--accent)" : "");
+      b.addEventListener("click", () => {
+        draft.category = c;
+        catWrap.querySelectorAll("button").forEach(x => x.style.cssText = base);
+        b.style.cssText = base + "border-color:var(--accent);color:var(--accent)";
+      });
+      catWrap.appendChild(b);
+    });
+    catField.appendChild(catWrap);
+    sheet.appendChild(catField);
+
+    const colourField = el("div", "field");
+    colourField.innerHTML = `<label>Colour</label>`;
+    const swatches = el("div", "swatches");
+    PALETTE.forEach(c => {
+      const b = el("button", "sw" + (draft.color === c ? " on" : ""));
+      b.style.background = c;
+      b.addEventListener("click", () => {
+        draft.color = c;
+        swatches.querySelectorAll(".sw").forEach(x => x.classList.remove("on"));
+        b.classList.add("on");
+      });
+      swatches.appendChild(b);
+    });
+    colourField.appendChild(swatches);
+    sheet.appendChild(colourField);
+
+    const actions = el("div", "sheet-actions");
+    actions.innerHTML = `<button class="ghost" id="cancelHabit">Cancel</button>
+      <button class="primary" id="saveHabit" style="margin:0">${habit ? "Save" : "Create"}</button>`;
+    sheet.appendChild(actions);
+
+    if(habit){
+      const del = el("button", "ghost danger");
+      del.textContent = "Delete habit";
+      del.style.cssText = "width:100%;margin-top:10px";
+      del.addEventListener("click", () => {
+        if(!confirm("Delete “" + habit.name + "” and all its history?")) return;
+        state.habits = state.habits.filter(x => x.id !== habit.id);
+        saveState(); closeSheet(); renderAll();
+        toast("Deleted");
+      });
+      sheet.appendChild(del);
+    }
+
+    sheet.querySelector("#cancelHabit").addEventListener("click", closeSheet);
+    sheet.querySelector("#saveHabit").addEventListener("click", () => {
+      const name = sheet.querySelector("#hName").value.trim();
+      if(!name){ toast("Give it a name first"); return; }
+      if(!draft.schedule.length){ toast("Pick at least one day"); return; }
+      draft.name = name;
+      if(draft.goal.type === "count"){
+        draft.goal.target = Math.max(1, parseInt(sheet.querySelector("#hTarget").value || "1", 10));
+        draft.goal.unit = sheet.querySelector("#hUnit").value.trim() || "times";
+      }
+
+      if(habit) Object.assign(habit, draft);
+      else state.habits.push(draft);
+
+      saveState(); closeSheet(); renderAll();
+      toast(habit ? "Saved" : "Habit added");
+    });
+  });
+}
+
+function openCountSheet(h){
+  const target = h.goal.target || 1;
+  openSheet(sheet => {
+    sheet.appendChild(el("h2", "", escapeHtml(h.name)));
+
+    const value = el("div");
+    value.style.cssText = "text-align:center;font-size:44px;font-weight:700;letter-spacing:-.03em;margin:6px 0 2px";
+    value.textContent = valueOn(h, todayStr());
+    const unit = el("div", "small muted");
+    unit.style.cssText = "text-align:center;margin-bottom:16px";
+    unit.textContent = "of " + target + " " + (h.goal.unit || "times") + " today";
+    sheet.appendChild(value);
+    sheet.appendChild(unit);
+
+    const track = el("div", "track");
+    track.style.height = "10px";
+    const fill = el("div", "fill");
+    fill.style.background = h.color;
+    track.appendChild(fill);
+    sheet.appendChild(track);
+
+    const controls = el("div");
+    controls.style.cssText = "display:flex;gap:12px;margin:18px 0 6px";
+    const minus = el("button", "ghost", "−");
+    minus.style.cssText = "flex:1;font-size:24px;padding:16px";
+    const plus = el("button", "primary", "＋");
+    plus.style.cssText = "flex:1;font-size:24px;padding:16px;margin:0";
+    controls.appendChild(minus); controls.appendChild(plus);
+    sheet.appendChild(controls);
+
+    const done = el("button", "ghost");
+    done.textContent = "Mark today complete";
+    done.style.cssText = "width:100%;margin-top:10px";
+    sheet.appendChild(done);
+
+    function paint(){
+      const v = valueOn(h, todayStr());
+      value.textContent = v;
+      fill.style.width = Math.min(100, (v/target)*100) + "%";
+      done.textContent = v >= target ? "Clear today" : "Mark today complete";
+    }
+
+    minus.addEventListener("click", () => { bumpValue(h, -1); paint(); });
+    plus.addEventListener("click", () => { bumpValue(h, 1); paint(); });
+    done.addEventListener("click", () => {
+      if(isDone(h)) delete h.log[todayStr()];
+      else h.log[todayStr()] = target;
+      saveState(); paint(); renderAll();
+    });
+
+    const close = el("button", "primary", "Done");
+    close.style.marginTop = "14px";
+    close.addEventListener("click", () => { closeSheet(); renderAll(); });
+    sheet.appendChild(close);
+
+    paint();
+  });
+}
+
+function bumpValue(h, delta){
+  const day = todayStr();
+  const target = h.goal.target || 1;
+  const next = clamp(valueOn(h, day) + delta, 0, target);
+  if(next <= 0) delete h.log[day]; else h.log[day] = next;
+  saveState();
+  if(next === target) toast("Target reached");
+}
+
+function openDaySheet(day){
+  const list = state.habits.filter(h => isScheduled(h, day) && h.created <= day);
+  openSheet(sheet => {
+    sheet.appendChild(el("h2", "", parse(day).toLocaleDateString(undefined,
+      {weekday:"long", day:"numeric", month:"long"})));
+    if(!list.length){
+      sheet.appendChild(el("div", "small muted", "Nothing scheduled that day."));
+      return;
+    }
+    list.forEach(h => {
+      const done = isDone(h, day);
+      const row = el("div", "habit");
+      row.style.marginBottom = "8px";
+      row.innerHTML = `
+        <div class="tick ${done?'on':''}" style="width:38px;height:38px;border-radius:12px;
+             background:${done?h.color:'transparent'}">
+          ${done ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M4 12.5l5 5L20 6.5"/></svg>' : ''}
+        </div>
+        <div class="body"><div class="name" style="font-size:14px">${escapeHtml(h.name)}</div>
+          <div class="meta">${h.goal.type==='count' ? (valueOn(h,day)+' / '+h.goal.target) : 'Yes / no'}</div></div>`;
+      row.addEventListener("click", () => {
+        toggleHabit(h, day);
+        closeSheet(); renderAll();
+        toast("Updated");
+      });
+      sheet.appendChild(row);
+    });
+  });
+}
+
+/* ------------------------------------------------------------------ router */
+function showPage(name){
+  ["today","stats","calendar","settings"].forEach(p => { $("#page-" + p).hidden = (p !== name); });
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.page === name));
+  if(name === "stats") renderStats();
+  if(name === "calendar") renderCalendar();
+  if(name === "settings") renderSettings();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll("nav button").forEach(b => {
+  b.addEventListener("click", () => showPage(b.dataset.page));
 });
 
-render();
+renderAll();
 </script>
 </body>
 </html>

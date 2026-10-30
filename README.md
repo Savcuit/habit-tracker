@@ -107,3 +107,27 @@ The Android package is now assembled on a Linux host with only Java installed:
 
 This means a new APK can be produced on the Raspberry Pi itself — no Android SDK and no
 Windows PC required. The desktop `.exe` still needs PyInstaller on Windows.
+
+## Version 4 — rebuilt as a proper application
+
+The phone app was rewritten rather than patched.
+
+**Structure** — four sections behind a fixed tab bar: Today, Stats, Calendar, More.
+
+**Habits** — each habit has a category, a colour, its own repeat days (Monday to Sunday),
+and either a yes/no goal or a counted one (e.g. 30 reps, 8 glasses). Counted habits open a
+stepper instead of a blunt tick.
+
+**Today** — a greeting that follows the clock and your name, a progress ring for the day,
+habits grouped into to-do, completed and not-scheduled-today, a streak badge on each card,
+and a week strip showing which days that habit runs.
+
+**Stats** — 7 / 30 / 90-day ranges, completion rate, current streak, best streak, total ticks,
+a daily completion chart, a weekday breakdown and a sorted per-habit table.
+
+**Calendar** — a month grid shaded by how much of each day was completed, with a legend and
+month arrows. Tapping any day opens that day's habits, so a forgotten day can be corrected.
+
+**More** — your name, the accent colour for the whole interface, JSON export and import,
+and an erase option. All data stays on the device; the storage format is versioned and older
+files are migrated automatically.
