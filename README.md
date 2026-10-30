@@ -96,3 +96,14 @@ The app is now three pages, switched from the bar at the bottom (Android) or the
 back through the months, and overall performance for each weekday.
 
 Colour intensity in the calendar means: pale = a little of the day completed, bright cyan = all of it.
+
+## Building without a Windows machine
+
+The Android package is now assembled on a Linux host with only Java installed:
+
+1. `repack_apk.py` (in `tools/`) rewrites the archive with a fresh page, keeping
+   `resources.arsc` stored and 4-byte aligned the way zipalign would.
+2. `apksigner` signs the result with the debug key.
+
+This means a new APK can be produced on the Raspberry Pi itself — no Android SDK and no
+Windows PC required. The desktop `.exe` still needs PyInstaller on Windows.
