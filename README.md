@@ -166,3 +166,11 @@ permission. The browser version has no reminders at all — a web page cannot wa
 
 `android/build.sh` produces a signed package with the Debian Android tools (`aapt2`, `zipalign`,
 `apksigner`), `javac` and `d8` — no Gradle, no Android Studio, no Windows.
+
+## Version 4.1.1 — scrolling fix
+
+The pages were ending underneath the tab bar. The cause was `height:100%` on the page body: it pinned
+the body to one screen, so the bottom padding sat *inside* that box and the overflowing content ran
+straight past it. The body now grows with its content (`min-height:100%`), and the page measures the
+tab bar after render and pads itself by exactly that height plus 28 px — so every page, at any screen
+size, stops above the bar rather than behind it.
