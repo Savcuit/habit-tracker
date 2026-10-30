@@ -256,6 +256,7 @@ function normalise(data){
     h.goal = h.goal || { type:"check", target:1, unit:"" };
     h.log = h.log || {};
     h.category = h.category || "Health";
+    h.reminder = h.reminder || "";
   });
   return data;
 }
@@ -353,6 +354,26 @@ function dayScore(day){
   const list = state.habits.filter(h => isScheduled(h, day) && h.created <= day);
   if(!list.length) return null;
   return list.filter(h => isDone(h, day)).length / list.length;
+}
+
+/* ============================================================== reminders */
+function remindersAvailable(){
+  return typeof window.AndroidReminders !== "undefined" && window.AndroidReminders;
+}
+
+function syncReminders(){
+  const bridge = remindersAvailable();
+  if(!bridge) return false;
+  try{
+    bridge.cancelAll();
+    state.habits.forEach(h => {
+      if(!h.reminder) return;
+      const [hh, mm] = h.reminder.split(":").map(Number);
+      if(isNaN(hh) || isNaN(mm)) return;
+      bridge.schedule(h.id, hh, mm, h.name, "Time for " + h.name);
+    });
+    return true;
+  }catch(e){ return false; }
 }
 
 /* =============================================================== rendering */
@@ -460,10 +481,11 @@ function habitCard(h, dim){
   const meta = h.goal.type === "count"
     ? `${valueOn(h, todayStr())} / ${h.goal.target} ${h.goal.unit || "times"}`
     : (done ? "Completed today" : "Tap to mark done");
+  const reminder = h.reminder ? `<span style="color:var(--accent)">⏰ ${h.reminder}</span>` : "";
   body.innerHTML = `
     <div class="name">${escapeHtml(h.name)}</div>
     <div class="meta"><span class="chip" style="color:${h.color};border-color:${h.color}44">${escapeHtml(h.category)}</span>
-      <span>${meta}</span></div>`;
+      <span>${meta}</span>${reminder}</div>`;
 
   const dots = el("div", "dots");
   for(let i=0;i<7;i++){
@@ -667,6 +689,8 @@ function renderSettings(){
   accent.appendChild(sw);
   host.appendChild(accent);
 
+  host.appendChild(reminderCard());
+
   const data = el("div", "card");
   data.style.marginTop = "12px";
   data.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Your data</div>
@@ -697,9 +721,55 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 3.0 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.1 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
+}
+
+function reminderCard(){
+  const card = el("div", "card");
+  card.style.marginTop = "12px";
+  const withTime = state.habits.filter(h => h.reminder).length;
+  const bridge = remindersAvailable();
+
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div>
+        <div style="font-weight:600">Reminders</div>
+        <div class="small muted" style="margin-top:3px">
+          ${withTime} habit${withTime === 1 ? "" : "s"} with a daily time</div>
+      </div>
+      <span class="chip" style="color:${bridge ? "var(--good)" : "var(--dim)"};
+        border-color:${bridge ? "rgba(74,222,128,.4)" : "var(--line)"}">${bridge ? "active" : "unavailable"}</span>
+    </div>`;
+
+  if(bridge){
+    const row = el("div");
+    row.style.cssText = "display:flex;gap:10px;margin-top:12px";
+    const test = el("button", "ghost", "Send a test in 1 minute");
+    test.style.flex = "1";
+    const resync = el("button", "ghost", "Update");
+    resync.style.flex = "0 0 auto";
+    row.appendChild(test); row.appendChild(resync);
+    card.appendChild(row);
+
+    test.addEventListener("click", () => {
+      try{
+        bridge.test("Habit Tracker", "This is what a reminder looks like.");
+        toast("Test notification in one minute");
+      }catch(e){ toast("Could not schedule the test"); }
+    });
+    resync.addEventListener("click", () => {
+      syncReminders();
+      toast("Reminders updated");
+    });
+  }else{
+    const note = el("div", "small muted");
+    note.style.marginTop = "8px";
+    note.textContent = "Scheduled notifications need the Android app; the browser version cannot wake the device.";
+    card.appendChild(note);
+  }
+  return card;
 }
 
 function exportData(){
@@ -811,6 +881,24 @@ function openHabitSheet(habit){
     });
     sheet.appendChild(goalField);
 
+    const reminderField = el("div", "field");
+    reminderField.innerHTML = `<label>Daily reminder</label>
+      <div style="display:flex;gap:10px">
+        <input type="time" id="hReminder" value="${escapeHtml(draft.reminder || "")}"
+          style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;color:var(--text);font-size:15px">
+        <button class="ghost" id="clearReminder" style="flex:0 0 auto">Clear</button>
+      </div>
+      <div class="small muted" style="margin-top:6px" id="reminderHint"></div>`;
+    sheet.appendChild(reminderField);
+
+    const hint = reminderField.querySelector("#reminderHint");
+    hint.textContent = remindersAvailable()
+      ? "A notification arrives at this time each day."
+      : "Notifications are available in the Android app.";
+    reminderField.querySelector("#clearReminder").addEventListener("click", () => {
+      sheet.querySelector("#hReminder").value = "";
+    });
+
     const catField = el("div", "field");
     catField.innerHTML = `<label>Category</label>`;
     const catWrap = el("div", "swatches");
@@ -868,6 +956,7 @@ function openHabitSheet(habit){
       if(!name){ toast("Give it a name first"); return; }
       if(!draft.schedule.length){ toast("Pick at least one day"); return; }
       draft.name = name;
+      draft.reminder = sheet.querySelector("#hReminder").value || "";
       if(draft.goal.type === "count"){
         draft.goal.target = Math.max(1, parseInt(sheet.querySelector("#hTarget").value || "1", 10));
         draft.goal.unit = sheet.querySelector("#hUnit").value.trim() || "times";
@@ -876,7 +965,7 @@ function openHabitSheet(habit){
       if(habit) Object.assign(habit, draft);
       else state.habits.push(draft);
 
-      saveState(); closeSheet(); renderAll();
+      saveState(); syncReminders(); closeSheet(); renderAll();
       toast(habit ? "Saved" : "Habit added");
     });
   });
@@ -994,10 +1083,13 @@ document.querySelectorAll("nav button").forEach(b => {
 });
 
 renderAll();
-
+syncReminders();
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "visible") syncReminders();
+});
 </script>
 </body>
 </html>

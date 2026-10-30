@@ -1,6 +1,8 @@
 package com.savcuit.habittracker;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -24,6 +26,8 @@ public class MainActivity extends Activity {
             w.setNavigationBarColor(Color.parseColor("#0a1120"));
         }
 
+        askForNotificationPermission();
+
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor("#0a1120"));
 
@@ -36,11 +40,21 @@ public class MainActivity extends Activity {
         s.setBuiltInZoomControls(false);
         s.setTextZoom(100);
 
+        web.addJavascriptInterface(new Reminders(this), "AndroidReminders");
         web.setWebViewClient(new WebViewClient());
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         setContentView(web);
 
         web.loadUrl("file:///android_asset/index.html");
+    }
+
+    private void askForNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
+            }
+        }
     }
 
     @Override

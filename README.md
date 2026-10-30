@@ -146,3 +146,23 @@ backup** on the old device and **Import** on the new one.
 
 The published copy lives in `docs/`; `index.html` there is the same file as `android/assets/index.html`
 plus the Apple meta tags, `manifest.json` and a small service worker for offline use.
+
+## Version 4.1 — daily reminders
+
+Each habit can carry a time of day. The Android build registers a repeating alarm with the
+system, so a notification arrives even when the app is closed:
+
+- set the time in the habit editor (**Daily reminder**); clear it to stop the reminder
+- the habit card shows the time next to its category
+- **More → Reminders** shows how many habits are armed, offers a test notification one minute
+  away, and can re-register everything
+- alarms are restored after a reboot, and Android 13+ asks for notification permission on first launch
+
+Honest limits: the alarm is deliberately inexact (`setInexactRepeating`), so a reminder can arrive a
+few minutes late under battery saving; that choice avoids asking for the special exact-alarm
+permission. The browser version has no reminders at all — a web page cannot wake a sleeping phone.
+
+### Building the APK on Linux
+
+`android/build.sh` produces a signed package with the Debian Android tools (`aapt2`, `zipalign`,
+`apksigner`), `javac` and `d8` — no Gradle, no Android Studio, no Windows.
