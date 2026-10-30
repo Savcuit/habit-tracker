@@ -81,3 +81,18 @@ Java wrapper is a single `WebView`. Requires JDK, Android SDK platform and build
 - Tap any heatmap square to change that day.
 - **Edit** button on the habit card — rename, recolour, retarget.
 - Deleting shows an **UNDO** bar for six seconds.
+
+## Version 3 — statistics and pages
+
+The app is now three pages, switched from the bar at the bottom (Android) or the tabs at the top
+(desktop):
+
+**Today** — the habit list and the selected habit's detail, as before.
+
+**Statistics** — totals for all habits: number of ticks, longest current streak, best streak ever,
+30-day completion, a 30-day completion line chart, and a bar per habit showing its own 30-day rate.
+
+**Calendar** — a month grid coloured by how much of that day was completed, with arrows to page
+back through the months, and overall performance for each weekday.
+
+Colour intensity in the calendar means: pale = a little of the day completed, bright cyan = all of it.

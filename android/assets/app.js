@@ -302,4 +302,161 @@ document.getElementById("saveBtn").addEventListener("click", () => {
   render();
 });
 
+/* ------------------------------------------------------------------ pages */
+function switchPage(name){
+  ["today","stats","calendar"].forEach(p => {
+    document.getElementById("page-" + p).hidden = (p !== name);
+  });
+  document.querySelectorAll("#tabs button").forEach(b => {
+    b.classList.toggle("on", b.dataset.page === name);
+  });
+  document.querySelector(".footer").style.visibility = (name === "today") ? "visible" : "hidden";
+  if(name === "stats") renderStats();
+  if(name === "calendar") renderCalendar();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("#tabs button").forEach(b => {
+  b.addEventListener("click", () => switchPage(b.dataset.page));
+});
+
+/* ------------------------------------------------------------- statistics */
+function habitsOn(day){
+  return state.habits.filter(h => h.created <= day);
+}
+function dayCompletion(day){
+  const list = habitsOn(day);
+  if(!list.length) return null;
+  return list.filter(h => h.done.includes(day)).length / list.length;
+}
+function series(days){
+  const out = [];
+  const now = new Date();
+  for(let i=days-1;i>=0;i--){
+    const d = iso(addDays(now, -i));
+    out.push({day:d, pct: dayCompletion(d)});
+  }
+  return out;
+}
+function renderStats(){
+  const all = state.habits;
+  const totalTicks = all.reduce((n,h) => n + h.done.length, 0);
+  const activeStreaks = all.map(streak).filter(Boolean);
+  const bestNow = activeStreaks.length ? Math.max(...activeStreaks) : 0;
+  const bestEver = all.length ? Math.max(...all.map(bestStreak)) : 0;
+  const last30 = series(30).filter(p => p.pct !== null);
+  const avg30 = last30.length ? last30.reduce((n,p) => n + p.pct, 0) / last30.length : 0;
+
+  document.getElementById("bigStats").innerHTML = `
+    <div class="stat"><b style="color:var(--accent)">${totalTicks}</b><small>TICKS</small></div>
+    <div class="stat"><b>${bestNow}</b><small>STREAK</small></div>
+    <div class="stat"><b>${bestEver}</b><small>BEST</small></div>
+    <div class="stat"><b>${Math.round(avg30*100)}%</b><small>30 DAYS</small></div>`;
+
+  // ---- trend line (SVG) ----
+  const svg = document.getElementById("trendChart");
+  const w = 320, h = 120, pad = 6;
+  const pts = last30.map((p,i) => {
+    const x = pad + (i * (w - pad*2) / Math.max(1, last30.length-1));
+    const y = h - pad - (p.pct || 0) * (h - pad*2);
+    return [x,y];
+  });
+  let path = "";
+  pts.forEach((p,i) => { path += (i ? " L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); });
+  const area = path + ` L ${pts.length ? pts[pts.length-1][0].toFixed(1) : pad} ${h-pad} L ${pad} ${h-pad} Z`;
+  svg.innerHTML = `
+    <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${area}" fill="url(#g1)"></path>
+    <path d="${path}" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linejoin="round"></path>
+    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#1e2d47"></line>`;
+
+  // ---- per-habit bars ----
+  const table = document.getElementById("habitTable");
+  table.innerHTML = "";
+  if(!state.habits.length){
+    table.innerHTML = '<div class="empty">No habits yet.</div>';
+    return;
+  }
+  state.habits.forEach(h => {
+    const pct = Math.round(completionRate(h) * 100);
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `<div class="bar-name">${escapeHtml(h.name)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${h.color}"></div></div>
+      <div class="bar-pct">${pct}%</div>`;
+    table.appendChild(row);
+  });
+}
+
+/* --------------------------------------------------------------- calendar */
+let calMonth = new Date();
+function renderCalendar(){
+  const label = document.getElementById("monthLabel");
+  const head = document.getElementById("calHead");
+  const grid = document.getElementById("calGrid");
+  const year = calMonth.getFullYear(), month = calMonth.getMonth();
+  label.textContent = calMonth.toLocaleDateString(undefined,{month:"long", year:"numeric"});
+
+  head.innerHTML = DAY_LETTERS.map(d => `<div>${d}</div>`).join("");
+
+  const first = new Date(year, month, 1);
+  const offset = (first.getDay() + 6) % 7;          // Monday-first
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  grid.innerHTML = "";
+  for(let i=0;i<offset;i++){
+    const pad = document.createElement("div");
+    pad.className = "pad";
+    grid.appendChild(pad);
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const key = iso(new Date(year, month, d));
+    const pct = dayCompletion(key) || 0;
+    const cell = document.createElement("div");
+    cell.textContent = d;
+    cell.title = key + " · " + Math.round(pct*100) + "%";
+    if(pct > 0){
+      cell.style.background = "rgba(34,211,238," + (0.18 + pct*0.82).toFixed(2) + ")";
+      cell.style.color = pct > 0.5 ? "#06131f" : "#cdeefb";
+    } else if(key > todayStr()){
+      cell.className = "dim";
+      cell.style.opacity = ".35";
+    }
+    grid.appendChild(cell);
+  }
+
+  // overall weekday performance
+  const totals = new Array(7).fill(0), hits = new Array(7).fill(0);
+  state.habits.forEach(h => {
+    let cursor = parse(h.created);
+    const stop = new Date();
+    while(cursor <= stop){
+      const idx = (cursor.getDay() + 6) % 7;
+      totals[idx]++;
+      if(h.done.includes(iso(cursor))) hits[idx]++;
+      cursor = addDays(cursor, 1);
+    }
+  });
+  const bars = document.getElementById("globalBars");
+  bars.innerHTML = "";
+  for(let i=0;i<7;i++){
+    const rate = totals[i] ? hits[i]/totals[i] : 0;
+    const wrap = document.createElement("div");
+    wrap.className = "barwrap";
+    wrap.innerHTML = `<div class="bar" style="height:${Math.max(3, rate*80)}px;
+       ${rate?'':'background:#1a2740'}"></div><small>${DAY_LETTERS[i]}</small>`;
+    bars.appendChild(wrap);
+  }
+}
+document.getElementById("prevMonth").addEventListener("click", () => {
+  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()-1, 1);
+  renderCalendar();
+});
+document.getElementById("nextMonth").addEventListener("click", () => {
+  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 1);
+  renderCalendar();
+});
+
 render();
