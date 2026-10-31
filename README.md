@@ -174,3 +174,14 @@ the body to one screen, so the bottom padding sat *inside* that box and the over
 straight past it. The body now grows with its content (`min-height:100%`), and the page measures the
 tab bar after render and pads itself by exactly that height plus 28 px — so every page, at any screen
 size, stops above the bar rather than behind it.
+
+## Version 4.2 — sharper statistics and fewer taps
+
+- **Streaks are now schedule-aware.** A Tuesday-only habit no longer breaks because Wednesday passed;
+  today being unfinished does not end a streak either. The longest-streak figure follows the same rule.
+- **A year heatmap** on Statistics: 27 weeks by 7 days, shaded by how much of each day was completed.
+- **Insights**: momentum (this week against last), habits at risk of losing a streak today, active days
+  in the last 90, and the weekday you are most reliable on.
+- **Swipe a habit** right to complete it, left to edit it, with an Undo in the toast.
+- **Three appearances**: Midnight, OLED black and Daylight, switched in More.
+- **Starter habits** on the empty screen — one tap adds a sensible first habit, undoable.

@@ -17,7 +17,16 @@
     --bg:#070d18; --panel:#0e1727; --panel2:#0b1422; --line:#1b2b44;
     --text:#e8f2ff; --muted:#7f8fa8; --dim:#55647c;
     --accent:#22d3ee; --good:#4ade80; --warn:#facc15; --bad:#f87171;
-    --r:16px; --pad:16px;
+    --r:16px; --pad:16px; --nav:rgba(14,23,39,.94);
+  }
+  [data-theme="oled"]{
+    --bg:#000000; --panel:#07090e; --panel2:#040508; --line:#1a2233;
+    --text:#f2f7ff; --muted:#8794a8; --dim:#5b6879; --nav:rgba(5,7,12,.96);
+  }
+  [data-theme="day"]{
+    --bg:#f4f7fb; --panel:#ffffff; --panel2:#eef3f9; --line:#dbe4ef;
+    --text:#101c2c; --muted:#5b6b80; --dim:#8695a8;
+    --accent:#0891b2; --nav:rgba(255,255,255,.95);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;min-height:100%;}
@@ -111,12 +120,15 @@
   .day.today{border-color:var(--accent);}
   .day.future{opacity:.35;}
   .day.pad{background:transparent;}
+  .heat{display:grid;grid-template-rows:repeat(7,9px);grid-auto-flow:column;
+        grid-auto-columns:9px;gap:3px;justify-content:space-between;}
+  .heat i{width:9px;height:9px;border-radius:2.5px;background:var(--panel2);display:block;}
   .legend{display:flex;align-items:center;gap:6px;margin-top:12px;color:var(--dim);font-size:10px;}
   .legend i{width:14px;height:10px;border-radius:3px;display:inline-block;}
 
   nav{
     position:fixed;left:0;right:0;bottom:0;z-index:20;
-    background:rgba(14,23,39,.94);
+    background:var(--nav);
     border-top:1px solid var(--line);backdrop-filter:blur(14px);
     padding:8px 8px calc(8px + env(safe-area-inset-bottom));
   }
@@ -234,12 +246,24 @@ const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const pct = v => Math.round(v*100);
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
-function toast(msg){
+function toast(msg, actionLabel, action){
   const t = $("#toast");
-  t.textContent = msg;
+  t.innerHTML = "";
+  const text = document.createElement("span");
+  text.textContent = msg;
+  t.appendChild(text);
+
+  if(actionLabel && action){
+    const btn = document.createElement("button");
+    btn.textContent = actionLabel;
+    btn.style.cssText = "margin-left:14px;color:var(--accent);font-weight:700;font-size:13px";
+    btn.addEventListener("click", () => { t.classList.remove("show"); action(); });
+    t.appendChild(btn);
+  }
+
   t.classList.add("show");
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove("show"), 2200);
+  t._timer = setTimeout(() => t.classList.remove("show"), action ? 4200 : 2200);
 }
 
 /* ==================================================================== state */
@@ -247,10 +271,10 @@ let state = loadState();
 let statsRange = 30;
 let calMonth = new Date();
 
-function defaultState(){ return { version: 2, habits: [], settings: { accent:"#22d3ee", name:"" } }; }
+function defaultState(){ return { version: 2, habits: [], settings: { accent:"#22d3ee", name:"", theme:"midnight" } }; }
 
 function normalise(data){
-  data.settings = Object.assign({ accent:"#22d3ee", name:"" }, data.settings||{});
+  data.settings = Object.assign({ accent:"#22d3ee", name:"", theme:"midnight" }, data.settings||{});
   data.habits.forEach(h => {
     h.schedule = Array.isArray(h.schedule) && h.schedule.length ? h.schedule : [0,1,2,3,4,5,6];
     h.goal = h.goal || { type:"check", target:1, unit:"" };
@@ -315,9 +339,26 @@ function toggleHabit(h, day){
 }
 
 function streak(h){
-  let n = 0, cursor = new Date();
-  if(!isDone(h, iso(cursor))) cursor = addDays(cursor, -1);
-  while(isDone(h, iso(cursor))){ n++; cursor = addDays(cursor, -1); }
+  // Only days the habit is scheduled for count; today being unfinished does not break it.
+  let n = 0;
+  const created = parse(h.created);
+  let cursor = new Date();
+  let guard = 0;
+
+  while(guard++ < 2000){
+    const key = iso(cursor);
+    if(cursor < created) break;
+    if(isScheduled(h, key)){
+      if(isDone(h, key)){
+        n++;
+      }else if(key === todayStr()){
+        // still time to finish today
+      }else{
+        break;
+      }
+    }
+    cursor = addDays(cursor, -1);
+  }
   return n;
 }
 
@@ -326,8 +367,12 @@ function bestStreak(h){
   if(!days.length) return 0;
   let best = 1, run = 1;
   for(let i=1;i<days.length;i++){
-    const diff = Math.round((parse(days[i]) - parse(days[i-1])) / 86400000);
-    run = diff === 1 ? run + 1 : 1;
+    let previous = addDays(parse(days[i]), -1);
+    while(previous >= parse(h.created) && !isScheduled(h, iso(previous))){
+      previous = addDays(previous, -1);
+    }
+    const joined = iso(previous) === days[i-1];
+    run = joined ? run + 1 : 1;
     if(run > best) best = run;
   }
   return best;
@@ -379,6 +424,7 @@ function syncReminders(){
 /* =============================================================== rendering */
 function renderAll(){
   document.documentElement.style.setProperty("--accent", state.settings.accent || "#22d3ee");
+  document.documentElement.setAttribute("data-theme", state.settings.theme || "midnight");
   renderHeader();
   renderToday();
   if(!$("#page-stats").hidden) renderStats();
@@ -413,6 +459,30 @@ function renderToday(){
     empty.innerHTML = `<div class="big">◐</div><h3>No habits yet</h3>
       <div class="small">Add the first one — something small enough that you cannot talk yourself out of it.</div>`;
     host.appendChild(empty);
+
+    const starters = [
+      ["Drink water", "#38bdf8", "Health", {type:"count", target:8, unit:"glasses"}],
+      ["Walk 20 minutes", "#4ade80", "Sport", {type:"check", target:1}],
+      ["Read 10 pages", "#a78bfa", "Study", {type:"check", target:1}]
+    ];
+    const quick = el("div");
+    quick.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px";
+    starters.forEach(([name, colour, category, goal]) => {
+      const chip = el("button", "ghost", "＋ " + name);
+      chip.style.cssText = "flex:0 0 auto;padding:10px 14px;font-size:13px";
+      chip.addEventListener("click", () => {
+        state.habits.push({
+          id: "h" + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+          name, color: colour, category, schedule: [0,1,2,3,4,5,6],
+          goal: Object.assign({unit:""}, goal), reminder: "", created: todayStr(), log: {}
+        });
+        saveState(); renderAll();
+        toast(name + " added", "Undo", () => { state.habits.pop(); saveState(); renderAll(); });
+      });
+      quick.appendChild(chip);
+    });
+    host.appendChild(quick);
+
     const btn = el("button", "primary", "＋ New habit");
     btn.addEventListener("click", () => openHabitSheet());
     host.appendChild(btn);
@@ -502,7 +572,44 @@ function habitCard(h, dim){
   card.appendChild(body);
   card.appendChild(side);
   card.addEventListener("click", () => openHabitSheet(h));
+  attachSwipe(card, h);
   return card;
+}
+
+function attachSwipe(card, h){
+  let startX = 0, startY = 0, dx = 0, active = false;
+
+  card.addEventListener("pointerdown", ev => {
+    if(ev.target.closest(".tick")) return;
+    startX = ev.clientX; startY = ev.clientY; dx = 0; active = true;
+    card.style.transition = "none";
+  });
+
+  card.addEventListener("pointermove", ev => {
+    if(!active) return;
+    dx = ev.clientX - startX;
+    if(Math.abs(ev.clientY - startY) > Math.abs(dx)) return;
+    card.style.transform = "translateX(" + Math.max(-96, Math.min(96, dx)) + "px)";
+  });
+
+  const finish = () => {
+    if(!active) return;
+    active = false;
+    card.style.transition = "transform .16s ease";
+    card.style.transform = "translateX(0)";
+
+    if(dx > 64 && !isDone(h)){
+      toggleHabit(h);
+      renderAll();
+      toast(h.name + " — done", "Undo", () => { toggleHabit(h); renderAll(); });
+    }else if(dx < -64){
+      openHabitSheet(h);
+    }
+  };
+
+  card.addEventListener("pointerup", finish);
+  card.addEventListener("pointercancel", finish);
+  card.addEventListener("pointerleave", finish);
 }
 
 /* ------------------------------------------------------------------- stats */
@@ -536,6 +643,10 @@ function renderStats(){
 
   host.appendChild(sectionTitle("Daily completion"));
   host.appendChild(trendChart(statsRange));
+  host.appendChild(sectionTitle("The year so far"));
+  host.appendChild(yearHeatmap());
+  host.appendChild(sectionTitle("Insights"));
+  host.appendChild(insightCards());
   host.appendChild(sectionTitle("By weekday"));
   host.appendChild(weekdayChart());
   host.appendChild(sectionTitle("Every habit"));
@@ -587,7 +698,36 @@ function trendChart(days){
   return card;
 }
 
-function weekdayChart(){
+function yearHeatmap(){
+  const card = el("div", "card");
+  const grid = el("div", "heat");
+  const today = new Date();
+  const start = addDays(today, -(26*7 + mondayIndex(today)));
+
+  for(let w=0; w<27; w++){
+    for(let d=0; d<7; d++){
+      const day = addDays(start, w*7 + d);
+      const key = iso(day);
+      const cell = el("i");
+      const score = day > today ? null : dayScore(key);
+      if(score) cell.style.background = "rgba(34,211,238," + (0.16 + score*0.8).toFixed(2) + ")";
+      cell.title = key + (score ? " · " + pct(score) + "%" : "");
+      grid.appendChild(cell);
+    }
+  }
+  card.appendChild(grid);
+
+  const legend = el("div", "legend");
+  legend.innerHTML = `<span>less</span>
+    <i style="background:var(--panel2)"></i>
+    <i style="background:rgba(34,211,238,.3)"></i>
+    <i style="background:rgba(34,211,238,.6)"></i>
+    <i style="background:rgba(34,211,238,.95)"></i><span>more</span>`;
+  card.appendChild(legend);
+  return card;
+}
+
+function weekdayRates(){
   const totals = new Array(7).fill(0), hits = new Array(7).fill(0);
   state.habits.forEach(h => {
     for(let d = parse(h.created); d <= new Date(); d = addDays(d,1)){
@@ -598,10 +738,62 @@ function weekdayChart(){
       if(isDone(h,key)) hits[idx]++;
     }
   });
+  return totals.map((t,i) => t ? hits[i]/t : 0);
+}
+
+function insightCards(){
+  const now = new Date();
+  const average = offset => {
+    let sum = 0, count = 0;
+    for(let i=0;i<7;i++){
+      const v = dayScore(iso(addDays(now, -(i + offset))));
+      if(v !== null){ sum += v; count++; }
+    }
+    return count ? sum/count : null;
+  };
+  const recent = average(0), before = average(7);
+  const momentum = (recent !== null && before !== null && before > 0.01)
+    ? Math.round(((recent - before) / before) * 100) : null;
+
+  let activeDays = 0;
+  for(let i=0;i<90;i++){
+    const v = dayScore(iso(addDays(now, -i)));
+    if(v !== null && v > 0) activeDays++;
+  }
+
+  const risks = state.habits.filter(h =>
+    streak(h) >= 2 && isScheduled(h, todayStr()) && !isDone(h));
+
+  const rates = weekdayRates();
+  const bestIdx = rates.indexOf(Math.max(...rates));
+
+  const card = el("div", "grid2");
+  const cell = (value, label, note, colour) => `
+    <div class="kpi">
+      <b style="font-size:22px;${colour ? "color:" + colour : ""}">${value}</b>
+      <span>${label}</span>
+      <div class="small muted" style="margin-top:4px;font-size:11px">${note}</div>
+    </div>`;
+
+  card.innerHTML =
+    cell(momentum === null ? "—" : (momentum >= 0 ? "+" : "") + momentum + "%",
+         "Momentum",
+         "this week vs last",
+         momentum === null ? "" : (momentum >= 0 ? "var(--good)" : "var(--bad)")) +
+    cell(risks.length, "At risk", risks.length ? "streak alive today" : "nothing pending",
+         risks.length ? "var(--warn)" : "") +
+    cell(activeDays, "Active days", "in the last 90") +
+    cell(["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][bestIdx],
+         "Best day", "highest completion");
+  return card;
+}
+
+function weekdayChart(){
+  const rates = weekdayRates();
   const card = el("div", "card");
   const bars = el("div", "bars");
   for(let i=0;i<7;i++){
-    const v = totals[i] ? hits[i]/totals[i] : 0;
+    const v = rates[i];
     const wrap = el("div", "barwrap");
     wrap.innerHTML = `<div class="bar" style="height:${6 + v*92}px;${v?'':'background:var(--line)'}"></div>
       <small>${DAYS[i]}</small>`;
@@ -691,6 +883,22 @@ function renderSettings(){
 
   host.appendChild(reminderCard());
 
+  const themeCard = el("div", "card");
+  themeCard.style.marginTop = "12px";
+  themeCard.innerHTML = `<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:700;margin-bottom:10px">Appearance</div>`;
+  const themes = [["midnight","Midnight"],["oled","OLED black"],["day","Daylight"]];
+  const themeSeg = el("div", "seg");
+  themes.forEach(([value, label]) => {
+    const b = el("button", (state.settings.theme || "midnight") === value ? "on" : "", label);
+    b.addEventListener("click", () => {
+      state.settings.theme = value;
+      saveState(); renderAll(); renderSettings();
+    });
+    themeSeg.appendChild(b);
+  });
+  themeCard.appendChild(themeSeg);
+  host.appendChild(themeCard);
+
   const data = el("div", "card");
   data.style.marginTop = "12px";
   data.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Your data</div>
@@ -721,7 +929,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.1 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.2 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
