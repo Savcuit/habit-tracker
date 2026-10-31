@@ -194,3 +194,13 @@ data — but a phone left running, or one that slept through midnight, kept show
 Now the app follows the clock: a timer fires just after midnight, a twenty-second check catches any
 drift, and returning to the app after a long sleep re-checks the date first. When the day changes the
 screen redraws, counted habits return to zero, and a brief "A new day — habits reset" confirms it.
+
+## Version 4.2.2 — the day can no longer go stale
+
+The midnight timer only helped while the app was awake. Switching tabs redrew only the tab you moved
+to, so the Today list could still be showing yesterday's state. Now every tab press re-reads the clock
+and redraws the header and the Today list before anything else.
+
+More also gained a plain line under **The app believes today is** showing the exact date and time the
+app is working from, with a **Refresh** button beside it — so a mismatch between phone and app is
+visible at a glance instead of guessed at.

@@ -926,10 +926,29 @@ function renderSettings(){
     }
   });
 
+  const clock = el("div", "card");
+  clock.style.marginTop = "12px";
+  const stamp = new Date();
+  clock.innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+      <div>
+        <div class="tiny">The app believes today is</div>
+        <div style="font-weight:600;margin-top:2px" id="todayLine">${todayStr()} · ${stamp.toLocaleString()}</div>
+      </div>
+      <button class="ghost" id="refreshDay" style="padding:9px 12px;font-size:12px">Refresh</button>
+    </div>`;
+  clock.querySelector("#refreshDay").addEventListener("click", () => {
+    renderedDay = "";
+    checkDayRollover();
+    renderAll(); renderSettings();
+    toast("Refreshed");
+  });
+  host.appendChild(clock);
+
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.2.1 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.2.2 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1281,6 +1300,11 @@ function openDaySheet(day){
 function showPage(name){
   ["today","stats","calendar","settings"].forEach(p => { $("#page-" + p).hidden = (p !== name); });
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.page === name));
+
+  checkDayRollover();
+  renderHeader();
+  renderToday();
+
   if(name === "stats") renderStats();
   if(name === "calendar") renderCalendar();
   if(name === "settings") renderSettings();
