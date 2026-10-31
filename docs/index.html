@@ -902,7 +902,9 @@ function renderSettings(){
   const data = el("div", "card");
   data.style.marginTop = "12px";
   data.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Your data</div>
-    <div class="small muted">${state.habits.length} habits · ${state.habits.reduce((n,h)=>n+Object.keys(h.log).length,0)} ticks recorded</div>`;
+    <div class="small muted">${state.habits.length} habits · ${state.habits.reduce((n,h)=>n+Object.keys(h.log).length,0)} ticks recorded</div>
+    <div class="small" style="color:var(--dim);margin-top:6px">
+      Backups are JSON files; import one to restore habits and history.</div>`;
   const row = el("div");
   row.style.cssText = "display:flex;gap:10px;margin-top:12px";
   row.innerHTML = `<button class="ghost" id="exportBtn" style="flex:1">Export backup</button>
@@ -948,7 +950,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.2.2 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.3 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1000,22 +1002,39 @@ function reminderCard(){
 }
 
 function exportData(){
-  const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+  const json = JSON.stringify(state, null, 2);
+  const name = "habits-backup-" + todayStr() + ".json";
+
+  // Inside the Android app a download link does nothing; write the file natively.
+  if(window.AndroidBackup && window.AndroidBackup.save){
+    const where = window.AndroidBackup.save(json, name);
+    if(String(where).startsWith("error")) toast("Backup failed: " + where);
+    else toast("Saved to " + where);
+    return;
+  }
+
+  const blob = new Blob([json], {type:"application/json"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "habits-backup-" + todayStr() + ".json";
+  a.download = name;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   toast("Backup downloaded");
 }
 
 function importData(){
+  // Keep the input in the document: some WebViews ignore a detached one.
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "application/json,.json";
+  input.style.cssText = "position:fixed;left:-100px;top:-100px;opacity:0";
+  document.body.appendChild(input);
+
   input.addEventListener("change", () => {
-    const file = input.files[0];
-    if(!file) return;
+    const file = input.files && input.files[0];
+    if(!file){ input.remove(); return; }
     const reader = new FileReader();
     reader.onload = () => {
       try{
@@ -1026,10 +1045,14 @@ function importData(){
         renderAll();
         toast("Backup restored");
       }catch(e){ toast("That file is not a valid backup"); }
+      input.remove();
     };
+    reader.onerror = () => { toast("Could not read that file"); input.remove(); };
     reader.readAsText(file);
   });
+
   input.click();
+  setTimeout(() => { if(!input.files || !input.files.length) input.remove(); }, 60000);
 }
 
 /* ------------------------------------------------------------------ sheets */

@@ -204,3 +204,13 @@ and redraws the header and the Today list before anything else.
 More also gained a plain line under **The app believes today is** showing the exact date and time the
 app is working from, with a **Refresh** button beside it — so a mismatch between phone and app is
 visible at a glance instead of guessed at.
+
+## Version 4.3 — backup and restore actually work on Android
+
+A WebView is not a browser: it refuses to open a file picker unless the app implements one, and it
+silently ignores download links. Both buttons therefore did nothing on the phone.
+
+- **Export** now hands the JSON to the app, which writes it to **Downloads/habits-backup-YYYY-MM-DD.json**
+  (Android 10+ via MediaStore; older versions use the app's Downloads folder). The toast reports the path.
+- **Import** opens the system file picker, reads the chosen file and restores habits and history.
+- The data card says plainly that backups are JSON files.

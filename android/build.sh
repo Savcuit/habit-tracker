@@ -32,7 +32,7 @@ echo "2/5 link"
 
 echo "3/5 compile java"
 find "$HERE/src" "$HERE/build/gen" -name "*.java" > "$HERE/build/sources.txt"
-javac -nowarn -source 8 -target 8 -classpath "$ANDROID_JAR" \
+javac -nowarn --release 8 -classpath "$ANDROID_JAR" \
   -d "$HERE/build/classes" @"$HERE/build/sources.txt" 2>&1 | grep -v "bootstrap class path" || true
 
 echo "4/5 dex"
