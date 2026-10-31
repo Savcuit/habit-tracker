@@ -185,3 +185,12 @@ size, stops above the bar rather than behind it.
 - **Swipe a habit** right to complete it, left to edit it, with an Undo in the toast.
 - **Three appearances**: Midnight, OLED black and Daylight, switched in More.
 - **Starter habits** on the empty screen — one tap adds a sensible first habit, undoable.
+
+## Version 4.2.1 — the day turns over at midnight
+
+Completions were always stored against a calendar date, so a new day was already a clean slate for the
+data — but a phone left running, or one that slept through midnight, kept showing yesterday's ticks.
+
+Now the app follows the clock: a timer fires just after midnight, a twenty-second check catches any
+drift, and returning to the app after a long sleep re-checks the date first. When the day changes the
+screen redraws, counted habits return to zero, and a brief "A new day — habits reset" confirms it.

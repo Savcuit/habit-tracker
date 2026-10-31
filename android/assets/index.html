@@ -922,7 +922,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.2 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.2.1 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1283,6 +1283,28 @@ document.querySelectorAll("nav button").forEach(b => {
   b.addEventListener("click", () => showPage(b.dataset.page));
 });
 
+/* Everything is stored per calendar day, so a new day is a clean slate.
+   These hooks make the screen follow the clock instead of waiting for a restart. */
+let renderedDay = todayStr();
+
+function checkDayRollover(){
+  const now = todayStr();
+  if(now === renderedDay) return false;
+  renderedDay = now;
+  renderAll();
+  fitToTabBar();
+  syncReminders();
+  toast("A new day — habits reset");
+  return true;
+}
+
+function scheduleMidnight(){
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 3);
+  const wait = Math.max(1000, next - now);
+  setTimeout(() => { checkDayRollover(); scheduleMidnight(); }, wait);
+}
+
 function fitToTabBar(){
   const nav = document.querySelector("nav");
   if(!nav) return;
@@ -1296,8 +1318,13 @@ renderAll();
 fitToTabBar();
 setTimeout(fitToTabBar, 250);
 syncReminders();
+scheduleMidnight();
+setInterval(checkDayRollover, 20000);
+
 document.addEventListener("visibilitychange", () => {
-  if(document.visibilityState === "visible") syncReminders();
+  if(document.visibilityState !== "visible") return;
+  checkDayRollover();
+  syncReminders();
 });
 </script>
 </body>

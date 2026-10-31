@@ -1,4 +1,4 @@
-const CACHE = "habits-v42";
+const CACHE = "habits-v421";
 const FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", event => {
