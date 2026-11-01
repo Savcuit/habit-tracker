@@ -11,6 +11,14 @@
 <meta name="description" content="A private, offline habit tracker with streaks, statistics and a calendar.">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-startup-image" href="splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)">
+<link rel="apple-touch-startup-image" href="splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
 <title>Habit Tracker</title>
 <style>
   :root{
@@ -74,7 +82,7 @@
         letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;}
   .streak{display:flex;align-items:center;gap:4px;color:var(--warn);font-size:12px;font-weight:700;}
   .dots{display:flex;gap:4px;margin-top:7px;}
-  .dots i{width:100%;height:4px;border-radius:2px;background:var(--line);}
+  .dots i{flex:1 1 0;min-width:0;height:4px;border-radius:2px;background:var(--line);}
   .dots i.on{background:var(--accent);}
   .dots i.today{box-shadow:0 0 0 1.5px var(--accent);}
 
@@ -271,10 +279,10 @@ let state = loadState();
 let statsRange = 30;
 let calMonth = new Date();
 
-function defaultState(){ return { version: 2, habits: [], settings: { accent:"#22d3ee", name:"", theme:"midnight" } }; }
+function defaultState(){ return { version: 2, habits: [], settings: { accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"" } }; }
 
 function normalise(data){
-  data.settings = Object.assign({ accent:"#22d3ee", name:"", theme:"midnight" }, data.settings||{});
+  data.settings = Object.assign({ accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"" }, data.settings||{});
   data.habits.forEach(h => {
     h.schedule = Array.isArray(h.schedule) && h.schedule.length ? h.schedule : [0,1,2,3,4,5,6];
     h.goal = h.goal || { type:"check", target:1, unit:"" };
@@ -489,6 +497,9 @@ function renderToday(){
     return;
   }
 
+  const hint = installHint();
+  if(hint) host.appendChild(hint);
+
   const scheduled = scheduledToday();
   const doneList = scheduled.filter(h => isDone(h));
   const todoList = scheduled.filter(h => !isDone(h));
@@ -566,7 +577,7 @@ function habitCard(h, dim){
 
   const side = el("div");
   const s = streak(h);
-  side.innerHTML = s ? `<div class="streak">🔥 ${s}</div>` : `<div class="tiny">—</div>`;
+  side.innerHTML = s ? `<div class="streak">🔥 ${s}</div>` : "";
 
   card.appendChild(tick);
   card.appendChild(body);
@@ -904,7 +915,8 @@ function renderSettings(){
   data.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Your data</div>
     <div class="small muted">${state.habits.length} habits · ${state.habits.reduce((n,h)=>n+Object.keys(h.log).length,0)} ticks recorded</div>
     <div class="small" style="color:var(--dim);margin-top:6px">
-      Backups are JSON files; import one to restore habits and history.</div>`;
+      Backups are JSON files; import one to restore habits and history.</div>
+    <div class="small" id="backupAge" style="margin-top:6px"></div>`;
   const row = el("div");
   row.style.cssText = "display:flex;gap:10px;margin-top:12px";
   row.innerHTML = `<button class="ghost" id="exportBtn" style="flex:1">Export backup</button>
@@ -916,8 +928,27 @@ function renderSettings(){
   data.appendChild(reset);
   host.appendChild(data);
 
+  const age = data.querySelector("#backupAge");
+  const last = state.settings.lastBackup;
+  if(state.habits.length){
+    if(!last){
+      age.textContent = "No backup taken yet — the phone is the only copy.";
+      age.style.color = "var(--warn)";
+    }else{
+      const days = Math.round((new Date() - parse(last)) / 86400000);
+      age.textContent = days === 0 ? "Last backup: today" : "Last backup: " + days + " day" + (days===1?"":"s") + " ago";
+      age.style.color = days > 14 ? "var(--warn)" : "var(--dim)";
+    }
+  }
+
   data.querySelector("#exportBtn").addEventListener("click", exportData);
   data.querySelector("#importBtn").addEventListener("click", importData);
+
+  const share = el("button", "ghost");
+  share.textContent = "Share the app";
+  share.style.cssText = "width:100%;margin-top:10px";
+  share.addEventListener("click", shareApp);
+  data.appendChild(share);
   reset.addEventListener("click", () => {
     if(confirm("Erase all habits and history? This cannot be undone.")){
       state = defaultState();
@@ -950,9 +981,49 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.3 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.4 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
+}
+
+async function shareApp(){
+  const url = "https://savcuit.github.io/habit-tracker/";
+  if(navigator.share){
+    try{ await navigator.share({title:"Habit Tracker", text:"A quiet habit tracker — offline, no account.", url}); return; }
+    catch(e){ /* cancelled */ }
+  }
+  try{ await navigator.clipboard.writeText(url); toast("Link copied — send it on"); }
+  catch(e){ toast(url); }
+}
+
+function isIosSafari(){
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+}
+
+function installHint(){
+  if(!isIosSafari()) return null;
+  if(window.navigator.standalone) return null;
+  if(localStorage.getItem("nexus.installHint") === "off") return null;
+
+  const card = el("div", "card");
+  card.style.cssText = "margin-bottom:14px;border-color:rgba(34,211,238,.35)";
+  card.innerHTML = `
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      <div style="font-size:22px;line-height:1">⬆️</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:14px">Add to your Home Screen</div>
+        <div class="small muted" style="margin-top:3px">
+          Tap Share, then “Add to Home Screen” — it then runs full screen and works offline.</div>
+      </div>
+      <button id="dismissHint" style="color:var(--dim);font-size:18px;line-height:1">×</button>
+    </div>`;
+  card.querySelector("#dismissHint").addEventListener("click", ev => {
+    ev.stopPropagation();
+    localStorage.setItem("nexus.installHint", "off");
+    card.remove();
+  });
+  return card;
 }
 
 function reminderCard(){
@@ -1009,7 +1080,7 @@ function exportData(){
   if(window.AndroidBackup && window.AndroidBackup.save){
     const where = window.AndroidBackup.save(json, name);
     if(String(where).startsWith("error")) toast("Backup failed: " + where);
-    else toast("Saved to " + where);
+    else { state.settings.lastBackup = todayStr(); saveState(); toast("Saved to " + where); }
     return;
   }
 
@@ -1021,6 +1092,8 @@ function exportData(){
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  state.settings.lastBackup = todayStr();
+  saveState();
   toast("Backup downloaded");
 }
 
@@ -1376,7 +1449,18 @@ scheduleMidnight();
 setInterval(checkDayRollover, 20000);
 
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  navigator.serviceWorker.register("sw.js").then(registration => {
+    if(registration.waiting) toast("An update is ready — reopen the app");
+    registration.addEventListener("updatefound", () => {
+      const fresh = registration.installing;
+      if(!fresh) return;
+      fresh.addEventListener("statechange", () => {
+        if(fresh.state === "installed" && navigator.serviceWorker.controller){
+          toast("An update is ready — reopen the app");
+        }
+      });
+    });
+  }).catch(() => {});
 }
 document.addEventListener("visibilitychange", () => {
   if(document.visibilityState !== "visible") return;

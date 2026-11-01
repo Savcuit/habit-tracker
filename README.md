@@ -214,3 +214,13 @@ silently ignores download links. Both buttons therefore did nothing on the phone
   (Android 10+ via MediaStore; older versions use the app's Downloads folder). The toast reports the path.
 - **Import** opens the system file picker, reads the chosen file and restores habits and history.
 - The data card says plainly that backups are JSON files.
+
+## Version 4.4 — a proper web app for iPhone
+
+- On an iPhone in Safari the app offers **Add to your Home Screen** with the exact two taps, and stops
+  offering once dismissed.
+- **Launch images** for eight screen sizes: opening from the home screen no longer flashes white.
+- **Share the app** in More, using the system share sheet where it exists.
+- The data card shows **when the last backup was taken**, in amber once it is more than a fortnight old.
+- A service-worker update now announces itself instead of silently waiting.
+- `tools/make_web.py` builds `docs/index.html` from the Android page, so the two cannot drift apart.
