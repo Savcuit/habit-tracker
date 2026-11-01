@@ -410,6 +410,30 @@ function dayScore(day){
 }
 
 /* ============================================================== reminders */
+function stepsAvailable(){
+  return typeof window.AndroidSteps !== "undefined" ? window.AndroidSteps : null;
+}
+
+let stepsCache = { value: null, at: 0 };
+
+function refreshSteps(){
+  const bridge = stepsAvailable();
+  if(!bridge) return null;
+  try{
+    if(bridge.permissionNeeded && bridge.permissionNeeded()) return null;
+    const value = bridge.todaySteps();
+    if(value >= 0) stepsCache = { value, at: Date.now() };
+  }catch(e){}
+  return stepsCache.value;
+}
+
+function usesSteps(){ return state.habits.some(h => h.goal && h.goal.type === "steps"); }
+
+function stepsToday(){
+  if(stepsCache.value === null || Date.now() - stepsCache.at > 45000) refreshSteps();
+  return stepsCache.value;
+}
+
 function remindersAvailable(){
   return typeof window.AndroidReminders !== "undefined" && window.AndroidReminders;
 }
@@ -455,7 +479,23 @@ function syncReminders(){
 }
 
 /* =============================================================== rendering */
+function applyStepGoal(){
+  const steps = stepsCache.value;
+  if(steps === null) return;
+  let changed = false;
+  state.habits.forEach(h => {
+    if(h.goal.type !== "steps") return;
+    if(steps >= h.goal.target && !isDone(h)){
+      h.log[todayStr()] = h.goal.target;
+      changed = true;
+    }
+  });
+  if(changed) saveState();
+}
+
 function renderAll(){
+  if(usesSteps()) refreshSteps();
+  applyStepGoal();
   document.documentElement.style.setProperty("--accent", state.settings.accent || "#22d3ee");
   document.documentElement.setAttribute("data-theme", state.settings.theme || "midnight");
   renderHeader();
@@ -566,7 +606,15 @@ function renderToday(){
 }
 
 function habitCard(h, dim){
-  const done = isDone(h);
+  const tracking = h.goal.type === "steps";
+  const steps = tracking ? stepsToday() : null;
+  const done = tracking ? (steps !== null && steps >= h.goal.target) : isDone(h);
+
+  if(tracking && done && !isDone(h)){
+    // trust the phone: record the day the moment the target is reached
+    h.log[todayStr()] = h.goal.target;
+    saveState();
+  }
   const card = el("div", "habit" + (done ? " done" : ""));
   if(dim) card.style.opacity = ".62";
 
@@ -574,9 +622,12 @@ function habitCard(h, dim){
   tick.style.background = done ? h.color : "transparent";
   tick.innerHTML = done
     ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>'
-    : (h.goal.type === "count" ? `<span>${valueOn(h, todayStr())}</span>` : "");
+    : (tracking
+        ? `<span style="font-size:9px;letter-spacing:-.02em">${steps === null ? "—" : Math.round(steps/1000) + "k"}</span>`
+        : (h.goal.type === "count" ? `<span>${valueOn(h, todayStr())}</span>` : ""));
   tick.addEventListener("click", ev => {
     ev.stopPropagation();
+    if(tracking){ refreshSteps(); renderAll(); toast(steps === null ? "No step sensor on this phone" : "Steps refreshed"); return; }
     if(h.goal.type === "count"){ openCountSheet(h); return; }
     toggleHabit(h);
     renderAll();
@@ -584,9 +635,13 @@ function habitCard(h, dim){
   });
 
   const body = el("div", "body");
-  const meta = h.goal.type === "count"
-    ? `${valueOn(h, todayStr())} / ${h.goal.target} ${h.goal.unit || "times"}`
-    : (done ? "Completed today" : "Tap to mark done");
+  const meta = tracking
+    ? (steps === null
+        ? "Step counter unavailable"
+        : `${steps.toLocaleString()} / ${h.goal.target.toLocaleString()} steps · from your phone`)
+    : h.goal.type === "count"
+      ? `${valueOn(h, todayStr())} / ${h.goal.target} ${h.goal.unit || "times"}`
+      : (done ? "Completed today" : "Tap to mark done");
   const reminder = h.reminder ? `<span style="color:var(--accent)">⏰ ${h.reminder}</span>` : "";
   body.innerHTML = `
     <div class="name">${escapeHtml(h.name)}</div>
@@ -1006,7 +1061,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.5.1 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.6 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1221,9 +1276,11 @@ function openHabitSheet(habit){
     const goalField = el("div", "field");
     goalField.innerHTML = `<label>Goal</label>`;
     const seg = el("div", "seg");
-    const btnCheck = el("button", draft.goal.type !== "count" ? "on" : "", "Yes / no");
+    const btnCheck = el("button", draft.goal.type === "check" ? "on" : "", "Yes / no");
     const btnCount = el("button", draft.goal.type === "count" ? "on" : "", "Count");
+    const btnSteps = el("button", draft.goal.type === "steps" ? "on" : "", "Steps");
     seg.appendChild(btnCheck); seg.appendChild(btnCount);
+    if(stepsAvailable()) seg.appendChild(btnSteps);
     goalField.appendChild(seg);
 
     const countWrap = el("div");
@@ -1233,18 +1290,26 @@ function openHabitSheet(habit){
       <input type="text" id="hUnit" placeholder="times" value="${escapeHtml(draft.goal.unit||"")}" style="flex:1">`;
     goalField.appendChild(countWrap);
 
-    btnCheck.addEventListener("click", () => {
-      draft.goal.type = "check"; draft.goal.target = 1;
-      btnCheck.classList.add("on"); btnCount.classList.remove("on");
-      countWrap.style.display = "none";
-    });
-    btnCount.addEventListener("click", () => {
-      draft.goal.type = "count";
-      if(!draft.goal.target || draft.goal.target < 2) draft.goal.target = 8;
-      sheet.querySelector("#hTarget").value = draft.goal.target;
-      btnCount.classList.add("on"); btnCheck.classList.remove("on");
-      countWrap.style.display = "flex";
-    });
+    function select(type){
+      [btnCheck, btnCount, btnSteps].forEach(b => b.classList.remove("on"));
+      draft.goal.type = type;
+      if(type === "check"){ draft.goal.target = 1; draft.goal.unit = ""; countWrap.style.display = "none"; btnCheck.classList.add("on"); }
+      if(type === "count"){
+        if(!draft.goal.target || draft.goal.target < 2) draft.goal.target = 8;
+        sheet.querySelector("#hTarget").value = draft.goal.target;
+        countWrap.style.display = "flex"; btnCount.classList.add("on");
+      }
+      if(type === "steps"){
+        if(!draft.goal.target || draft.goal.target < 1000) draft.goal.target = 10000;
+        sheet.querySelector("#hTarget").value = draft.goal.target;
+        sheet.querySelector("#hUnit").value = "steps";
+        countWrap.style.display = "flex"; btnSteps.classList.add("on");
+      }
+    }
+
+    btnCheck.addEventListener("click", () => select("check"));
+    btnCount.addEventListener("click", () => select("count"));
+    btnSteps.addEventListener("click", () => select("steps"));
     sheet.appendChild(goalField);
 
     const reminderField = el("div", "field");
@@ -1326,6 +1391,10 @@ function openHabitSheet(habit){
       if(draft.goal.type === "count"){
         draft.goal.target = Math.max(1, parseInt(sheet.querySelector("#hTarget").value || "1", 10));
         draft.goal.unit = sheet.querySelector("#hUnit").value.trim() || "times";
+      }
+      if(draft.goal.type === "steps"){
+        draft.goal.target = Math.max(100, parseInt(sheet.querySelector("#hTarget").value || "10000", 10));
+        draft.goal.unit = "steps";
       }
 
       if(habit) Object.assign(habit, draft);
@@ -1473,6 +1542,8 @@ function checkDayRollover(){
   const now = todayStr();
   if(now === renderedDay) return false;
   renderedDay = now;
+  const bridge = stepsAvailable();
+  if(bridge && bridge.resetBaseline){ try{ bridge.resetBaseline(); }catch(e){} }
   renderAll();
   fitToTabBar();
   syncReminders();
@@ -1503,6 +1574,12 @@ setTimeout(fitToTabBar, 250);
 syncReminders();
 scheduleMidnight();
 setInterval(checkDayRollover, 20000);
+setInterval(() => {
+  if(!usesSteps() || document.visibilityState !== "visible") return;
+  const before = stepsCache.value;
+  refreshSteps();
+  if(stepsCache.value !== before) renderToday();
+}, 45000);
 
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   navigator.serviceWorker.register("sw.js").then(registration => {

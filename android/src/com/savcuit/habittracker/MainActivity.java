@@ -49,6 +49,7 @@ public class MainActivity extends Activity implements FileChooserClient.Host {
 
         web.addJavascriptInterface(new Reminders(this), "AndroidReminders");
         web.addJavascriptInterface(new Backup(this), "AndroidBackup");
+        web.addJavascriptInterface(new Steps(this), "AndroidSteps");
 
         // Without a chrome client the page's file picker never opens, so Import did nothing.
         web.setWebChromeClient(new FileChooserClient(this));
@@ -102,11 +103,21 @@ public class MainActivity extends Activity implements FileChooserClient.Host {
     }
 
     private void askForNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= 33) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                    != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
-            }
+        java.util.ArrayList<String> needed = new java.util.ArrayList<>();
+
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+        if (Build.VERSION.SDK_INT >= 29
+                && checkSelfPermission("android.permission.ACTIVITY_RECOGNITION")
+                != PackageManager.PERMISSION_GRANTED) {
+            needed.add("android.permission.ACTIVITY_RECOGNITION");
+        }
+
+        if (!needed.isEmpty()) {
+            requestPermissions(needed.toArray(new String[0]), 1);
         }
     }
 

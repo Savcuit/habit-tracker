@@ -250,3 +250,19 @@ no permission, and reports the real reason if it ever fails.
 
 More → Reminders also states plainly when notifications are switched off for the app, with a button that
 opens the right Android settings page.
+
+## Version 4.6 — habits the phone can verify
+
+A habit can now be a **step goal** (10,000 steps, say). The app reads the phone's own step counter, so the
+tick is earned rather than claimed:
+
+- **Steps** is a third goal type in the habit editor, with a target.
+- The card shows live progress — `6,240 / 10,000 steps · from your phone` — and ticks itself the moment
+  the target is reached, recording the day in the history like any other habit.
+- It refreshes while the app is open (every 45 seconds) and whenever you switch tabs.
+- Android 10 and later ask for **Physical activity** permission; without a step sensor the option is
+  simply not offered.
+
+Honest limits: the sensor counts from the last reboot, so the app keeps a daily baseline — taken at the
+midnight rollover, or from the last reading if the phone was seen recently. If the phone is rebooted the
+count restarts, which the app detects and handles. Steps taken in apps that block sensors are invisible.
