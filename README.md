@@ -317,3 +317,20 @@ and back — with a 200 ms debounce and a guard that ignores an arm that barely 
 printed under the counter, so the numbers are visible rather than guessed at.
 
 The model also looks at a sharper input (257 px instead of 193), which steadies the joint positions.
+
+## Version 4.9 — the reason nothing counted
+
+The angle was being computed from the **average of both arms**, and that average was only produced when
+both arms were visible. In a real push-up — watched from the side or from the floor — the far arm is
+hidden by the body, so the angle came back empty and the app said "whole body in frame" even though it
+was. Nothing could ever count.
+
+Three changes:
+
+- the angle now comes from **whichever arm is visible**, preferring the more bent one when both are;
+- if the wrists are cut off, the elbow–shoulder–hip angle stands in, so a tight frame still yields a number;
+- a second signal — **how far the shoulders sink towards the hips** — is blended in, so a repetition
+  registers even when the arms are poorly tracked. The readout says `shoulders` when only that signal is live.
+
+Verified with a side-on pose where the far arm is hidden (score 0.1): the near arm alone now yields 90°,
+where the old code yielded nothing. A shoulder-only down-and-up sequence counted exactly one rep.

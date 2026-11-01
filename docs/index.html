@@ -1079,7 +1079,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.8 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.9 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1249,7 +1249,7 @@ const TRAIN = {
   stream: null, net: null, raf: null, running: false,
   exercise: "pushups", facing: "user", reps: 0, seconds: 0, goodFrames: 0, frames: 0,
   phase: "up", lastPhaseAt: 0, lastTick: 0, postureBadSince: 0, habitId: "",
-  lo: 155, hi: 170, angle: null
+  lo: 155, hi: 170, angle: null, dropLo: 0.6, dropHi: 1.1
 };
 
 function trainEl(){ return $("#page-train"); }
@@ -1388,6 +1388,7 @@ async function startTraining(){
   TRAIN.reps = 0; TRAIN.seconds = 0; TRAIN.goodFrames = 0; TRAIN.frames = 0;
   TRAIN.phase = "up"; TRAIN.lastTick = performance.now(); TRAIN.lastPhaseAt = 0;
   TRAIN.lo = 155; TRAIN.hi = 170; TRAIN.angle = null;
+  TRAIN.dropLo = 0.6; TRAIN.dropHi = 1.1;
   loopTraining(video, canvas, msg);
 }
 
@@ -1419,14 +1420,16 @@ async function trainFrame(video, canvas, msg){
   const dt = (now - TRAIN.lastTick) / 1000;
   TRAIN.lastTick = now;
 
-  const angle = bodyAngle(pose, TRAIN.exercise);
+  const info = readPose(pose);
+  const angle = TRAIN.exercise === "pushups" ? info.armAngle : info.trunk;
+  const drop = info.drop;
   TRAIN.frames++;
 
   if(TRAIN.exercise === "plank"){
     const result = updatePlank(angle, dt);
     msg.textContent = result.message + (angle === null ? "" : " · " + Math.round(angle) + "°");
   }else{
-    const result = updatePushup(angle, now);
+    const result = updatePushup(angle, now, drop);
     msg.textContent = result.message;
   }
 
@@ -1480,16 +1483,33 @@ function updatePlank(angle, dt){
  * That way a phone placed high, low or at an angle still works: the first movement
  * teaches the app your top and bottom positions.
  */
-function updatePushup(angle, now){
-  if(angle === null) return {message: "Whole body in frame, please"};
+function updatePushup(angle, now, drop){
+  if(angle === null && (drop === null || drop === undefined)) return {message: "Whole body in frame, please"};
 
-  TRAIN.angle = angle;
-  TRAIN.lo = Math.min(TRAIN.lo, angle);
-  TRAIN.hi = Math.max(TRAIN.hi, angle);
+  // Two signals: the elbow bend, and how far the shoulders sink towards the hands.
+  let normArm = null, normDrop = null;
 
-  const span = Math.max(1, TRAIN.hi - TRAIN.lo);
-  const norm = (angle - TRAIN.lo) / span;
-  const reliable = span >= 20;                   // ignore a barely-moving arm        // 0 = deepest bend, 1 = arm straight
+  if(angle !== null){
+    TRAIN.lo = Math.min(TRAIN.lo, angle);
+    TRAIN.hi = Math.max(TRAIN.hi, angle);
+    normArm = (angle - TRAIN.lo) / Math.max(1, TRAIN.hi - TRAIN.lo);
+    TRAIN.angle = angle;
+  }
+
+  if(typeof drop === "number" && isFinite(drop)){
+    TRAIN.dropLo = Math.min(TRAIN.dropLo, drop);
+    TRAIN.dropHi = Math.max(TRAIN.dropHi, drop);
+    normDrop = (drop - TRAIN.dropLo) / Math.max(0.05, TRAIN.dropHi - TRAIN.dropLo);
+  }
+
+  let norm = normArm;
+  if(normArm !== null && normDrop !== null) norm = 0.6 * normArm + 0.4 * normDrop;
+  else if(normArm === null) norm = normDrop;
+  if(norm === null) return {message: "Whole body in frame, please"};
+
+  const spanArm = TRAIN.hi - TRAIN.lo;
+  const spanDrop = TRAIN.dropHi - TRAIN.dropLo;
+  const reliable = spanArm >= 15 || spanDrop >= 0.15;
 
   const down = norm < 0.38, up = norm > 0.62;
   let counted = false;
@@ -1500,29 +1520,66 @@ function updatePushup(angle, now){
     counted = true;
   }
 
-  const shown = Math.round(angle) + "°";
+  const shown = angle === null ? "shoulders" : Math.round(angle) + "°";
   return {
     counted,
     message: (down ? "Down — now push" : up ? "Full range — lower yourself" : "Moving") + " · " + shown
   };
 }
 
-function bodyAngle(pose, exercise){
-  const k = {};
-  (pose.keypoints || []).forEach(p => { if(p.score > 0.3) k[p.part] = p.position; });
-  const mean = (a, b) => a && b ? {x: (a.x+b.x)/2, y: (a.y+b.y)/2} : null;
+function updatePlank(angle, dt){
+  if(angle === null) return {message: "Stand fully in frame"};
+  if(angle > 160){
+    TRAIN.seconds += dt;
+    TRAIN.goodFrames++;
+    return {good: true, message: "Good line — hold it"};
+  }
+  return {good: false, message: "Straighten your hips"};
+}
 
-  if(exercise === "pushups"){
-    const shoulder = mean(k.leftShoulder, k.rightShoulder);
-    const elbow = mean(k.leftElbow, k.rightElbow);
-    const wrist = mean(k.leftWrist, k.rightWrist);
-    return angleAt(elbow, shoulder, wrist);
+
+function readPose(pose){
+  const k = {};
+  (pose.keypoints || []).forEach(p => { if(p.score >= 0.2) k[p.part] = {x: p.position.x, y: p.position.y}; });
+
+  const midpoint = (a, b) => {
+    if(a && b) return {x: (a.x+b.x)/2, y: (a.y+b.y)/2};
+    return a || b || null;
+  };
+
+  const leftArm = angleAt(k.leftElbow, k.leftShoulder, k.leftWrist);
+  const rightArm = angleAt(k.rightElbow, k.rightShoulder, k.rightWrist);
+
+  let armAngle = null;
+  if(leftArm !== null && rightArm !== null) armAngle = Math.min(leftArm, rightArm);
+  else armAngle = leftArm !== null ? leftArm : rightArm;
+
+  // A missing wrist still lets the upper arm give a rough idea.
+  if(armAngle === null){
+    const fallbackLeft = angleAt(k.leftElbow, k.leftShoulder, k.leftHip);
+    const fallbackRight = angleAt(k.rightElbow, k.rightShoulder, k.rightHip);
+    armAngle = fallbackLeft !== null ? fallbackLeft : fallbackRight;
   }
 
-  const shoulder = mean(k.leftShoulder, k.rightShoulder);
-  const hip = mean(k.leftHip, k.rightHip);
-  const ankle = mean(k.leftAnkle, k.rightAnkle);
-  return angleAt(hip, shoulder, ankle);
+  const shoulder = midpoint(k.leftShoulder, k.rightShoulder);
+  const hip = midpoint(k.leftHip, k.rightHip);
+  const ankle = midpoint(k.leftAnkle, k.rightAnkle);
+
+  const trunk = (shoulder && hip && ankle) ? angleAt(hip, shoulder, ankle) : null;
+
+  // shoulder height relative to the hip, in units of torso length: falls during a push-up
+  let drop = null;
+  if(shoulder && hip){
+    const torso = Math.max(1, Math.hypot(shoulder.x - hip.x, shoulder.y - hip.y));
+    drop = (shoulder.y - hip.y) / torso;
+  }
+
+  return {armAngle, trunk, drop, found: Object.keys(k).length};
+}
+
+function bodyAngle(pose, exercise){
+  const info = readPose(pose);
+  return exercise === "pushups" ? info.armAngle : info.trunk;
 }
 
 function angleAt(b, a, c){
