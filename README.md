@@ -294,3 +294,14 @@ button swaps lenses mid-session.
 
 The skeleton overlay also now sizes itself to the incoming picture, so joints sit exactly on the body
 instead of drifting when the camera resolution changes.
+
+## Version 4.7.2 — the model loads inside the app
+
+The Train tab failed with "could not load the model: failed fetch" because a WebView blocks `fetch()`
+against `file://` URLs by default — the scripts loaded, but the model weights did not.
+
+Two changes, belt and braces:
+
+- the WebView settings now permit file-URL access, which is what the model needs;
+- if a fetch still fails, the page reads `model.json` and the weights with `XMLHttpRequest` and hands
+  TensorFlow an in-memory loader, which needs no network stack at all.

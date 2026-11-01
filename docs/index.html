@@ -1079,7 +1079,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.7.1 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.7.2 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1364,11 +1364,18 @@ async function startTraining(){
   try{
     await loadVision();
     if(!TRAIN.net){
-      TRAIN.net = await posenet.load({modelUrl: "vision/model/model.json",
-                                      inputResolution: 193, outputStride: 16, multiplier: 0.5});
+      const config = {inputResolution: 193, outputStride: 16, multiplier: 0.5};
+      try{
+        TRAIN.net = await posenet.load(Object.assign({modelUrl: "vision/model/model.json"}, config));
+      }catch(firstError){
+        // Some WebViews refuse fetch() on file:// — read the files directly instead.
+        msg.textContent = "Loading the model from the app…";
+        TRAIN.net = await posenet.load(Object.assign({modelUrl: await modelHandler()}, config));
+      }
     }
   }catch(e){
-    msg.textContent = "Could not load the model: " + e.message;
+    msg.textContent = "Could not load the model: " + (e.message || e) +
+      ". Try opening the app again, or use the web version.";
     return;
   }
 
@@ -1428,6 +1435,32 @@ async function trainFrame(video, canvas, msg){
     : TRAIN.reps + " reps";
   if(quality) quality.textContent = TRAIN.frames
     ? Math.round((TRAIN.goodFrames / TRAIN.frames) * 100) + "% form" : "—";
+}
+
+function readBinary(path){
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", path, true);
+    xhr.responseType = "arraybuffer";
+    xhr.onload = () => (xhr.status === 200 || xhr.status === 0 ? resolve(xhr.response)
+                                                                 : reject(new Error("HTTP " + xhr.status)));
+    xhr.onerror = () => reject(new Error("network"));
+    xhr.send();
+  });
+}
+
+async function modelHandler(){
+  const text = new TextDecoder("utf-8").decode(await readBinary("vision/model/model.json"));
+  const json = JSON.parse(text);
+  const shard = await readBinary("vision/model/" + json.weightsManifest[0].paths[0]);
+
+  return {
+    load: async () => ({
+      modelTopology: json.modelTopology,
+      weightSpecs: json.weightsManifest[0].weights,
+      weightData: shard
+    })
+  };
 }
 
 function updatePlank(angle, dt){

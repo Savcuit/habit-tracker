@@ -43,6 +43,10 @@ public class MainActivity extends Activity implements FileChooserClient.Host {
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(true);
         s.setAllowContentAccess(true);
+        // The pose model and its weights are read from the app's own assets with fetch(),
+        // which a WebView blocks on file:// unless these are enabled.
+        s.setAllowFileAccessFromFileURLs(true);
+        s.setAllowUniversalAccessFromFileURLs(true);
         s.setSupportZoom(false);
         s.setBuiltInZoomControls(false);
         s.setTextZoom(100);
