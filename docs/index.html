@@ -1006,7 +1006,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.5 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.5.1 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1069,6 +1069,23 @@ function reminderCard(){
     </div>`;
 
   if(bridge){
+    let allowed = true;
+    try{ allowed = bridge.notificationsAllowed ? bridge.notificationsAllowed() : true; }catch(e){}
+    if(!allowed){
+      const warn = el("div", "small");
+      warn.style.cssText = "margin-top:8px;color:var(--warn)";
+      warn.textContent = "Notifications are switched off for this app, so reminders cannot appear.";
+      card.appendChild(warn);
+
+      const open = el("button", "ghost");
+      open.textContent = "Open notification settings";
+      open.style.cssText = "width:100%;margin-top:8px";
+      open.addEventListener("click", () => {
+        try{ bridge.openNotificationSettings(); }catch(e){ toast("Open Android settings → Apps → Habit Tracker"); }
+      });
+      card.appendChild(open);
+    }
+
     const row = el("div");
     row.style.cssText = "display:flex;gap:10px;margin-top:12px";
     const test = el("button", "ghost", "Send a test in 1 minute");
@@ -1080,9 +1097,10 @@ function reminderCard(){
 
     test.addEventListener("click", () => {
       try{
-        bridge.test("Habit Tracker", "This is what a reminder looks like.");
-        toast("Test notification in one minute");
-      }catch(e){ toast("Could not schedule the test"); }
+        const result = bridge.test("Habit Tracker", "This is what a reminder looks like.");
+        if(result && String(result).startsWith("error")) toast("Could not schedule: " + result);
+        else toast("Test notification in one minute");
+      }catch(e){ toast("Could not schedule: " + e.message); }
     });
     resync.addEventListener("click", () => {
       syncReminders();

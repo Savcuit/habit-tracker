@@ -62,6 +62,35 @@ public class Reminders {
     }
 
     @JavascriptInterface
+    public boolean notificationsAllowed() {
+        try {
+            android.app.NotificationManager nm = (android.app.NotificationManager)
+                    activity.getSystemService(Context.NOTIFICATION_SERVICE);
+            return nm != null && nm.areNotificationsEnabled();
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    @JavascriptInterface
+    public void openNotificationSettings() {
+        try {
+            Intent intent = new Intent("android.settings.APP_NOTIFICATION_SETTINGS");
+            intent.putExtra("android.provider.extra.APP_PACKAGE", activity.getPackageName());
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.startActivity(intent);
+        } catch (Exception e) {
+            try {
+                Intent fallback = new Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.parse("package:" + activity.getPackageName()));
+                fallback.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                activity.startActivity(fallback);
+            } catch (Exception ignored) { }
+        }
+    }
+
+    @JavascriptInterface
     public int count() {
         return prefs.getAll().size();
     }
@@ -88,7 +117,7 @@ public class Reminders {
 
     /** Schedules a single alarm one minute from now, so the user can see one arrive. */
     @JavascriptInterface
-    public void test(String title, String body) {
+    public String test(String title, String body) {
         Calendar c = Calendar.getInstance();
         c.add(Calendar.MINUTE, 1);
         prefs.edit().putString("__test", "-1|-1|" + clean(title) + "|" + clean(body)).apply();
@@ -98,11 +127,19 @@ public class Reminders {
         intent.putExtra("direct_body", clean(body));
 
         AlarmManager am = (AlarmManager) activity.getSystemService(Context.ALARM_SERVICE);
-        if (am == null) return;
+        if (am == null) return "error: no alarm service";
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pi = PendingIntent.getBroadcast(activity, 9999, intent, flags);
-        am.setExact(AlarmManager.RTC_WAKEUP, c.getTimeInMillis(), pi);
+
+        try {
+            // Deliberately inexact: setExact needs the special exact-alarm permission from
+            // Android 12 onwards, and a test does not warrant asking the user for that.
+            am.set(AlarmManager.RTC_WAKEUP, c.getTimeInMillis(), pi);
+            return "";
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
     }
 
     // ---------------------------------------------------------------- internals

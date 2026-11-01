@@ -241,3 +241,12 @@ updates install cleanly over one another.
 
 Because the key changed, this one build cannot install over the previous version. To keep the history:
 **Export backup → uninstall the old app → install this APK → Import**.
+
+## Version 4.5.1 — the reminder test, fixed
+
+The test button used an **exact** alarm, which Android 12 and later refuse without the special
+exact-alarm permission — hence "could not schedule the test". It now uses an ordinary alarm, which needs
+no permission, and reports the real reason if it ever fails.
+
+More → Reminders also states plainly when notifications are switched off for the app, with a button that
+opens the right Android settings page.
