@@ -1064,7 +1064,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.7.2 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.8 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1233,7 +1233,8 @@ function importData(){
 const TRAIN = {
   stream: null, net: null, raf: null, running: false,
   exercise: "pushups", facing: "user", reps: 0, seconds: 0, goodFrames: 0, frames: 0,
-  phase: "up", lastPhaseAt: 0, lastTick: 0, postureBadSince: 0, habitId: ""
+  phase: "up", lastPhaseAt: 0, lastTick: 0, postureBadSince: 0, habitId: "",
+  lo: 155, hi: 170, angle: null
 };
 
 function trainEl(){ return $("#page-train"); }
@@ -1349,7 +1350,7 @@ async function startTraining(){
   try{
     await loadVision();
     if(!TRAIN.net){
-      const config = {inputResolution: 193, outputStride: 16, multiplier: 0.5};
+      const config = {inputResolution: 257, outputStride: 16, multiplier: 0.5};
       try{
         TRAIN.net = await posenet.load(Object.assign({modelUrl: "vision/model/model.json"}, config));
       }catch(firstError){
@@ -1371,6 +1372,7 @@ async function startTraining(){
   TRAIN.running = true;
   TRAIN.reps = 0; TRAIN.seconds = 0; TRAIN.goodFrames = 0; TRAIN.frames = 0;
   TRAIN.phase = "up"; TRAIN.lastTick = performance.now(); TRAIN.lastPhaseAt = 0;
+  TRAIN.lo = 155; TRAIN.hi = 170; TRAIN.angle = null;
   loopTraining(video, canvas, msg);
 }
 
@@ -1407,7 +1409,7 @@ async function trainFrame(video, canvas, msg){
 
   if(TRAIN.exercise === "plank"){
     const result = updatePlank(angle, dt);
-    msg.textContent = result.message;
+    msg.textContent = result.message + (angle === null ? "" : " · " + Math.round(angle) + "°");
   }else{
     const result = updatePushup(angle, now);
     msg.textContent = result.message;
@@ -1458,19 +1460,36 @@ function updatePlank(angle, dt){
   return {good: false, message: "Straighten your hips"};
 }
 
+/**
+ * Reps are counted against the range your own arm actually travels, not a fixed angle.
+ * That way a phone placed high, low or at an angle still works: the first movement
+ * teaches the app your top and bottom positions.
+ */
 function updatePushup(angle, now){
   if(angle === null) return {message: "Whole body in frame, please"};
 
-  const down = angle < 100, up = angle > 150;
+  TRAIN.angle = angle;
+  TRAIN.lo = Math.min(TRAIN.lo, angle);
+  TRAIN.hi = Math.max(TRAIN.hi, angle);
+
+  const span = Math.max(1, TRAIN.hi - TRAIN.lo);
+  const norm = (angle - TRAIN.lo) / span;
+  const reliable = span >= 20;                   // ignore a barely-moving arm        // 0 = deepest bend, 1 = arm straight
+
+  const down = norm < 0.38, up = norm > 0.62;
   let counted = false;
 
   if(down && TRAIN.phase !== "down"){ TRAIN.phase = "down"; TRAIN.lastPhaseAt = now; }
-  if(up && TRAIN.phase === "down" && now - TRAIN.lastPhaseAt > 220){
+  if(up && TRAIN.phase === "down" && reliable && now - TRAIN.lastPhaseAt > 200){
     TRAIN.phase = "up"; TRAIN.reps++; TRAIN.goodFrames++;
     counted = true;
   }
 
-  return {counted, message: down ? "Down — now push" : (up ? "Full range" : "Keep going")};
+  const shown = Math.round(angle) + "°";
+  return {
+    counted,
+    message: (down ? "Down — now push" : up ? "Full range — lower yourself" : "Moving") + " · " + shown
+  };
 }
 
 function bodyAngle(pose, exercise){

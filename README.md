@@ -305,3 +305,15 @@ Two changes, belt and braces:
 - the WebView settings now permit file-URL access, which is what the model needs;
 - if a fetch still fails, the page reads `model.json` and the weights with `XMLHttpRequest` and hands
   TensorFlow an in-memory loader, which needs no network stack at all.
+
+## Version 4.8 — reps counted against your own range
+
+Fixed angles were the wrong idea: a phone propped high, low or off to the side reads the elbow
+differently, so a correct push-up could sit above the "down" threshold and never count.
+
+The detector now learns your range during the session. It tracks the straightest and deepest elbow angles
+it has seen, and calls a repetition only when you travel from the top quarter of that range to the bottom
+and back — with a 200 ms debounce and a guard that ignores an arm that barely moves. The live angle is
+printed under the counter, so the numbers are visible rather than guessed at.
+
+The model also looks at a sharper input (257 px instead of 193), which steadies the joint positions.
