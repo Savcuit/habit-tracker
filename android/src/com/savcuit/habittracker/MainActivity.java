@@ -115,6 +115,10 @@ public class MainActivity extends Activity implements FileChooserClient.Host {
                 != PackageManager.PERMISSION_GRANTED) {
             needed.add("android.permission.ACTIVITY_RECOGNITION");
         }
+        if (checkSelfPermission(Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.CAMERA);
+        }
 
         if (!needed.isEmpty()) {
             requestPermissions(needed.toArray(new String[0]), 1);

@@ -266,3 +266,22 @@ tick is earned rather than claimed:
 Honest limits: the sensor counts from the last reboot, so the app keeps a daily baseline — taken at the
 midnight rollover, or from the last reading if the phone was seen recently. If the phone is rebooted the
 count restarts, which the app detects and handles. Steps taken in apps that block sensors are invisible.
+
+## Version 4.7 — camera workout tracking, entirely on the phone
+
+A fifth tab, **Train**, counts exercises from the camera. Nothing is uploaded: a pose model runs inside
+the app, and only your own phone sees the frames.
+
+- **Push-ups** — counts a repetition when the elbows pass below 100° and return above 150°, with a short
+  debounce so a wobble cannot count twice.
+- **Plank** — times the hold while the hip angle stays above 160°, and tells you to straighten when it
+  drops.
+- A live skeleton, a rep or second counter, and a **form percentage** are drawn over the picture.
+- When you stop, choose a habit and it is marked done for the day.
+
+Offline by design: TensorFlow.js, PoseNet (MobileNet 0.50) and its weights are bundled in the app, about
+4 MB, so the model loads with no network at all.
+
+Limits worth knowing: the pose model needs decent light and the whole body in frame; it recognises
+posture and joint angles, not kit, so a rowing machine or a pull-up bar is beyond it. The floor is the
+best place for the phone. The web version can do the same where the browser allows camera access.
