@@ -1064,7 +1064,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.7 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.7.1 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1232,7 +1232,7 @@ function importData(){
 /* ------------------------------------------------------------------- train */
 const TRAIN = {
   stream: null, net: null, raf: null, running: false,
-  exercise: "pushups", reps: 0, seconds: 0, goodFrames: 0, frames: 0,
+  exercise: "pushups", facing: "user", reps: 0, seconds: 0, goodFrames: 0, frames: 0,
   phase: "up", lastPhaseAt: 0, lastTick: 0, postureBadSince: 0, habitId: ""
 };
 
@@ -1267,7 +1267,7 @@ function renderTrain(){
   const note = el("div", "small muted");
   note.style.marginTop = "10px";
   note.textContent = CameraSupported()
-    ? "Prop the phone so your whole body is in frame, then start."
+    ? "Prop the phone so your whole body is in frame. It opens on the front camera; press Flip for the rear one."
     : "The camera needs the Android app (or a browser over https).";
   host.appendChild(note);
 }
@@ -1311,7 +1311,19 @@ async function startTraining(){
   hud.innerHTML = `<div class="train-pill" id="trainCount">0</div>
                    <div class="train-pill" id="trainQuality">—</div>`;
   const msg = el("div", "train-msg", "Starting the camera…");
-  stage.appendChild(video); stage.appendChild(canvas); stage.appendChild(hud); stage.appendChild(msg);
+  const mirrored = TRAIN.facing === "user";
+  video.style.transform = mirrored ? "scaleX(-1)" : "none";
+  canvas.style.transform = mirrored ? "scaleX(-1)" : "none";
+
+  const flip = el("button", "ghost", mirrored ? "Switch to back" : "Switch to front");
+  flip.style.cssText = "position:absolute;right:12px;bottom:52px;padding:8px 12px;font-size:12px;background:rgba(4,10,18,.72)";
+  flip.addEventListener("click", async () => {
+    TRAIN.facing = TRAIN.facing === "user" ? "environment" : "user";
+    stopTraining(false);
+    setTimeout(startTraining, 150);
+  });
+
+  stage.appendChild(video); stage.appendChild(canvas); stage.appendChild(hud); stage.appendChild(msg); stage.appendChild(flip);
   host.appendChild(stage);
 
   const stop = el("button", "ghost");
@@ -1322,7 +1334,7 @@ async function startTraining(){
 
   try{
     TRAIN.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment", width: {ideal: 640}, height: {ideal: 480} }, audio: false
+      video: { facingMode: TRAIN.facing, width: {ideal: 720}, height: {ideal: 960} }, audio: false
     });
     video.srcObject = TRAIN.stream;
     await video.play();
@@ -1364,6 +1376,11 @@ function loopTraining(video, canvas, msg){
 
 async function trainFrame(video, canvas, msg){
   if(!video.videoWidth) return;
+
+  if(canvas.width !== video.videoWidth || canvas.height !== video.videoHeight){
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+  }
 
   let pose = null;
   try{

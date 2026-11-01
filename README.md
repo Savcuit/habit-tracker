@@ -285,3 +285,12 @@ Offline by design: TensorFlow.js, PoseNet (MobileNet 0.50) and its weights are b
 Limits worth knowing: the pose model needs decent light and the whole body in frame; it recognises
 posture and joint angles, not kit, so a rowing machine or a pull-up bar is beyond it. The floor is the
 best place for the phone. The web version can do the same where the browser allows camera access.
+
+## Version 4.7.1 — the front camera
+
+The Train tab now opens on the **front camera**, which is the sensible one when the phone is propped
+up facing you — and it is mirrored, like a mirror, so movement feels natural. A **Switch to back**
+button swaps lenses mid-session.
+
+The skeleton overlay also now sizes itself to the incoming picture, so joints sit exactly on the body
+instead of drifting when the camera resolution changes.
