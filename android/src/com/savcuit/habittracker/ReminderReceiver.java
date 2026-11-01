@@ -57,8 +57,21 @@ public class ReminderReceiver extends BroadcastReceiver {
                .setContentText(body)
                .setSmallIcon(android.R.drawable.ic_popup_reminder)
                .setAutoCancel(true)
-               .setContentIntent(tap);
+               .setContentIntent(tap)
+               .addAction(android.R.drawable.checkbox_on_background, "Done",
+                       action(context, id, "done", 1))
+               .addAction(android.R.drawable.ic_popup_sync, "Snooze 15 min",
+                       action(context, id, "snooze", 2));
 
         nm.notify(id.hashCode(), builder.build());
+    }
+
+    private static PendingIntent action(Context context, String id, String what, int salt) {
+        Intent intent = new Intent(context, ActionReceiver.class)
+                .putExtra("action", what)
+                .putExtra("id", id);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        return PendingIntent.getBroadcast(context, id.hashCode() + salt, intent, flags);
     }
 }

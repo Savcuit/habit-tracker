@@ -399,6 +399,31 @@ function remindersAvailable(){
   return typeof window.AndroidReminders !== "undefined" && window.AndroidReminders;
 }
 
+function applyPendingMarks(){
+  const bridge = remindersAvailable();
+  if(!bridge || typeof bridge.takePending !== "function") return 0;
+
+  let ids = [];
+  try{ ids = JSON.parse(bridge.takePending() || "[]"); }catch(e){ return 0; }
+  if(!Array.isArray(ids) || !ids.length) return 0;
+
+  let marked = 0;
+  ids.forEach(id => {
+    const h = state.habits.find(x => x.id === id);
+    if(h && !isDone(h)){
+      h.log[todayStr()] = (h.goal && h.goal.target) || 1;
+      marked++;
+    }
+  });
+
+  if(marked){
+    saveState();
+    renderAll();
+    toast(marked + (marked === 1 ? " habit" : " habits") + " marked done from the reminder");
+  }
+  return marked;
+}
+
 function syncReminders(){
   const bridge = remindersAvailable();
   if(!bridge) return false;
@@ -966,7 +991,7 @@ function renderSettings(){
   const about = el("div", "card");
   about.style.marginTop = "12px";
   about.innerHTML = `<div style="font-weight:600">Habit Tracker</div>
-    <div class="small muted" style="margin-top:4px">Version 4.4 · offline, no account, no tracking.
+    <div class="small muted" style="margin-top:4px">Version 4.5 · offline, no account, no tracking.
     Your habits live only on this device.</div>`;
   host.appendChild(about);
 }
@@ -1395,6 +1420,18 @@ document.querySelectorAll("nav button").forEach(b => {
   b.addEventListener("click", () => showPage(b.dataset.page));
 });
 
+/* App shortcuts open a page directly: #stats, #new … */
+(function openShortcut(){
+  const target = (location.hash || "").replace("#", "").trim();
+  if(!target) return;
+  if(target === "new"){
+    showPage("today");
+    setTimeout(() => openHabitSheet(), 250);
+    return;
+  }
+  if(["today","stats","calendar","settings"].includes(target)) showPage(target);
+})();
+
 /* Everything is stored per calendar day, so a new day is a clean slate.
    These hooks make the screen follow the clock instead of waiting for a restart. */
 let renderedDay = todayStr();
@@ -1427,6 +1464,7 @@ window.addEventListener("resize", fitToTabBar);
 window.addEventListener("orientationchange", () => setTimeout(fitToTabBar, 120));
 
 renderAll();
+applyPendingMarks();
 fitToTabBar();
 setTimeout(fitToTabBar, 250);
 syncReminders();

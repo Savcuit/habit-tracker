@@ -57,7 +57,21 @@ public class MainActivity extends Activity implements FileChooserClient.Host {
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         setContentView(web);
 
-        web.loadUrl("file:///android_asset/index.html");
+        web.loadUrl(pageUrl(getIntent()));
+    }
+
+    private static String pageUrl(Intent intent) {
+        String page = intent == null ? null : intent.getStringExtra("page");
+        String base = "file:///android_asset/index.html";
+        if (page == null || page.length() == 0) return base;
+        return base + "#" + page;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (web != null) web.loadUrl(pageUrl(intent));
     }
 
     @Override

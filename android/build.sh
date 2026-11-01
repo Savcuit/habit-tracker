@@ -9,7 +9,9 @@ BIN="$SDK/debian/bin"
 LIB="$SDK/debian/lib"
 ANDROID_JAR="$SDK/android-13/android.jar"
 D8_JAR="$SDK/android-14/lib/d8.jar"
-KEYSTORE="${KEYSTORE:-/tmp/habit_apk/debug.p12}"
+KEYSTORE="${KEYSTORE:-$HOME/.hermes/keys/habittracker.p12}"
+KEY_ALIAS="${KEY_ALIAS:-habittracker}"
+STORE_PASS="${STORE_PASS:-$(cat "$HOME/.hermes/keys/habittracker.pass" 2>/dev/null || echo android)}"
 OUT="${OUT:-$HERE/../release/HabitTracker.apk}"
 
 export LD_LIBRARY_PATH="$LIB:${LD_LIBRARY_PATH:-}"
@@ -54,8 +56,8 @@ PY
 
 mkdir -p "$(dirname "$OUT")"
 java -jar "$LIB/apksigner.jar" sign \
-  --ks "$KEYSTORE" --ks-type PKCS12 --ks-key-alias androiddebugkey \
-  --ks-pass pass:android --key-pass pass:android \
+  --ks "$KEYSTORE" --ks-type PKCS12 --ks-key-alias "$KEY_ALIAS" \
+  --ks-pass "pass:$STORE_PASS" --key-pass "pass:$STORE_PASS" \
   --out "$OUT" "$HERE/build/aligned.apk"
 
 java -jar "$LIB/apksigner.jar" verify "$OUT"

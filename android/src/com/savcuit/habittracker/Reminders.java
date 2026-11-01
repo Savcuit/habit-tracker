@@ -10,7 +10,9 @@ import android.os.Build;
 import android.webkit.JavascriptInterface;
 
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Bridge between the web page and Android's alarm system.
@@ -62,6 +64,26 @@ public class Reminders {
     @JavascriptInterface
     public int count() {
         return prefs.getAll().size();
+    }
+
+    /** Hands over habits the user completed from the notification, then clears the queue. */
+    @JavascriptInterface
+    public String takePending() {
+        SharedPreferences pending = activity.getSharedPreferences(ActionReceiver.PENDING, Context.MODE_PRIVATE);
+        Set<String> ids = pending.getStringSet("ids", new HashSet<String>());
+        if (ids == null || ids.isEmpty()) return "[]";
+
+        StringBuilder out = new StringBuilder("[");
+        boolean first = true;
+        for (String id : ids) {
+            if (!first) out.append(",");
+            out.append("\"").append(id.replace("\"", "")).append("\"");
+            first = false;
+        }
+        out.append("]");
+
+        pending.edit().putStringSet("ids", new HashSet<String>()).apply();
+        return out.toString();
     }
 
     /** Schedules a single alarm one minute from now, so the user can see one arrive. */

@@ -224,3 +224,20 @@ silently ignores download links. Both buttons therefore did nothing on the phone
 - The data card shows **when the last backup was taken**, in amber once it is more than a fortnight old.
 - A service-worker update now announces itself instead of silently waiting.
 - `tools/make_web.py` builds `docs/index.html` from the Android page, so the two cannot drift apart.
+
+## Version 4.5 — Android polish, and a durable signing key
+
+- **Adaptive launcher icon** (with a monochrome layer for themed icons) instead of a flat bitmap.
+- **A proper splash screen** on Android 12+ and a dark window background below it — no white flash.
+- **App shortcuts**: long-press the icon for *New habit* and *Statistics*.
+- **Actionable reminders**: the notification now carries **Done** and **Snooze 15 min**. Done is queued
+  and applied the moment the app is next opened, with a toast saying so.
+
+### The signing key moved
+
+The earlier packages were signed with a throwaway key in `/tmp`, which no longer exists. Builds are now
+signed with `~/.hermes/keys/habittracker.p12` (password in `habittracker.pass`, both mode 600), so future
+updates install cleanly over one another.
+
+Because the key changed, this one build cannot install over the previous version. To keep the history:
+**Export backup → uninstall the old app → install this APK → Import**.
