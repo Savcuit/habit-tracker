@@ -334,3 +334,27 @@ Three changes:
 
 Verified with a side-on pose where the far arm is hidden (score 0.1): the near arm alone now yields 90°,
 where the old code yielded nothing. A shoulder-only down-and-up sequence counted exactly one rep.
+
+## Version 5.0 — streak freezes, and a nudge at the right hour
+
+Two freezes, in the spirit of Duolingo, so an accidental day does not erase months of work.
+
+- **Two freezes** sit in inventory. When a scheduled day goes by unfinished, one is spent
+  automatically and the day is recorded as frozen — the streak carries on.
+- A frozen day is drawn in **icy blue with a ❄** in the calendar and the year heatmap, so it is
+  never mistaken for a day you actually did.
+- The habit card shows `🔥 12` with `❄ 1` beneath it when part of that streak was protected.
+- **One freeze is earned back every seven days**, up to the maximum of two.
+- The `❄ n freezes` chip under the date opens a short explanation of the rules.
+- A freeze is only spent when the streak before the missed day is worth at least two — a habit you
+  have barely started is not protected, so the freezes are not wasted.
+
+Notifications:
+
+- **20:30, streak at risk** — fires only if something scheduled for today is still unfinished, and
+  names the habits (`Reading, Stretch — finish them before midnight`). Completing everything
+  cancels it.
+- **Milestones** — 3, 7, 14, 21, 30, 50, 75, 100, 150, 200 and 365 days open a celebration screen
+  with confetti and a line of encouragement. Each milestone is celebrated once per habit.
+
+Android 5.0 (`versionCode 17`) and the web build in `docs/` both carry it.

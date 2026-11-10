@@ -183,6 +183,31 @@
   .chips button{flex:1;padding:11px;border-radius:12px;border:1px solid var(--line);color:var(--muted);font-weight:700;font-size:13px}
   .chips button.on{background:var(--accent);border-color:var(--accent);color:#04121c}
 
+  .freeze{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;
+          color:#8fd8ff;border:1px solid rgba(125,211,252,.45);background:rgba(56,189,248,.13);
+          border-radius:999px;padding:3px 9px;margin-top:8px;}
+  .freeze.empty{color:var(--muted);border-color:var(--line);background:transparent;}
+  .freeze b{font-size:11px;}
+  .day.frozen{background:rgba(56,189,248,.34);color:#e3f6ff;box-shadow:inset 0 0 0 1px rgba(125,211,252,.55);}
+  .day.frozen::after{content:"❄";font-size:9px;position:absolute;top:2px;right:3px;opacity:.9;}
+  .calgrid .day{position:relative;}
+  .heat i.frozen{background:#38bdf8;box-shadow:0 0 0 1px rgba(4,18,28,.5) inset;}
+
+  #confetti{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden;display:none;}
+  #confetti i{position:absolute;width:8px;height:13px;border-radius:2px;animation:fall 1.9s cubic-bezier(.2,.6,.4,1) forwards;}
+  @keyframes fall{from{transform:translateY(-25vh) rotate(0deg);opacity:1}
+                   to{transform:translateY(110vh) rotate(520deg);opacity:.85}}
+
+  .celeb{position:fixed;inset:0;z-index:61;display:none;place-items:center;padding:24px;
+         background:rgba(5,8,15,.86);backdrop-filter:blur(7px);text-align:center;}
+  .celeb.show{display:grid;}
+  .celeb .inner{max-width:340px;}
+  .celeb .flame{font-size:64px;line-height:1;filter:drop-shadow(0 0 22px rgba(250,204,21,.55));}
+  .celeb h2{font-size:26px;margin:14px 0 6px;}
+  .celeb p{color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:22px;}
+  .celeb button{width:100%;padding:15px;border-radius:14px;background:var(--accent);
+                color:#04121c;font-weight:800;font-size:15px;}
+
   #toast{
     position:fixed;left:50%;bottom:90px;transform:translate(-50%,20px);z-index:40;
     background:#132033;border:1px solid var(--line);border-radius:12px;
@@ -199,6 +224,7 @@
     <div class="hello">
       <h1 id="greeting">Good day</h1>
       <div class="small muted" id="dateLine"></div>
+      <button id="freezeChip" class="freeze" type="button">❄ <b>2</b> freezes</button>
     </div>
     <div class="ring">
       <svg width="74" height="74" viewBox="0 0 74 74">
@@ -234,6 +260,8 @@
 
 <div class="backdrop" id="backdrop"></div>
 <div class="sheet" id="sheet"></div>
+<div id="confetti"></div>
+<div class="celeb" id="celeb"></div>
 <div id="toast"></div>
 
 <script>
@@ -281,10 +309,19 @@ let state = loadState();
 let statsRange = 30;
 let calMonth = new Date();
 
-function defaultState(){ return { version: 2, habits: [], settings: { accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"" } }; }
+function defaultState(){ return { version: 2, habits: [], freezes: blankFreezes(), settings: { accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"" } }; }
+
+function blankFreezes(){
+  return { pool: 2, max: 2, used: {}, lastRefill: todayStr(), celebrated: {} };
+}
 
 function normalise(data){
   data.settings = Object.assign({ accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"" }, data.settings||{});
+  data.freezes = Object.assign(blankFreezes(), data.freezes||{});
+  data.freezes.used = data.freezes.used || {};
+  data.freezes.celebrated = data.freezes.celebrated || {};
+  if(typeof data.freezes.pool !== "number") data.freezes.pool = 2;
+  if(typeof data.freezes.max !== "number") data.freezes.max = 2;
   data.habits.forEach(h => {
     h.schedule = Array.isArray(h.schedule) && h.schedule.length ? h.schedule : [0,1,2,3,4,5,6];
     h.goal = h.goal || { type:"check", target:1, unit:"" };
@@ -340,12 +377,197 @@ function valueOn(h, day){ return h.log[day] || 0; }
 function isDone(h, day){ const d = day || todayStr(); return valueOn(h, d) >= ((h.goal && h.goal.target) || 1); }
 function isScheduled(h, day){ return h.schedule.includes(mondayIndex(parse(day))); }
 
+/* ------------------------------------------------------------ streak freezes */
+/* Two freezes, each one protects a single missed scheduled day so a long streak
+   survives an accident. They refill by one every seven days, up to two. */
+
+function freezeKey(h, day){ return h.id + "|" + day; }
+function isFrozen(h, day){ return !!state.freezes.used[freezeKey(h, day)]; }
+function frozenOnDay(day){
+  return Object.keys(state.freezes.used).some(k => k.split("|")[1] === day);
+}
+function freezePool(){ return state.freezes.pool || 0; }
+
+function spendFreeze(h, day){
+  if(state.freezes.pool <= 0) return false;
+  state.freezes.pool--;
+  state.freezes.used[freezeKey(h, day)] = todayStr();
+  return true;
+}
+
+function daysBetween(a, b){
+  return Math.round((parse(b) - parse(a)) / 86400000);
+}
+
+function refillFreezes(){
+  const f = state.freezes;
+  if(!f.lastRefill) f.lastRefill = todayStr();
+  const gap = daysBetween(f.lastRefill, todayStr());
+  if(gap < 7) return 0;
+  const gain = Math.min(f.max - f.pool, Math.floor(gap / 7));
+  if(gain > 0){
+    f.pool += gain;
+    f.lastRefill = iso(addDays(parse(f.lastRefill), Math.floor(gap / 7) * 7));
+    return gain;
+  }
+  return 0;
+}
+
+function frozenInStreak(h){
+  let n = 0;
+  let cursor = new Date();
+  const created = parse(h.created);
+  let guard = 0;
+  while(guard++ < 2000){
+    const key = iso(cursor);
+    if(cursor < created) break;
+    if(isScheduled(h, key)){
+      if(isDone(h, key) || isFrozen(h, key)){
+        if(isFrozen(h, key)) n++;
+      }else if(key !== todayStr()){
+        break;
+      }
+    }
+    cursor = addDays(cursor, -1);
+  }
+  return n;
+}
+
+function streakBefore(h, day){
+  let n = 0;
+  let cursor = addDays(parse(day), -1);
+  const created = parse(h.created);
+  let guard = 0;
+  while(guard++ < 400 && cursor >= created){
+    const key = iso(cursor);
+    if(isScheduled(h, key)){
+      if(isDone(h, key) || isFrozen(h, key)) n++;
+      else break;
+    }
+    cursor = addDays(cursor, -1);
+  }
+  return n;
+}
+
+function autoFreeze(){
+  let spent = 0;
+  let lastName = "", lastDay = "";
+  state.habits.forEach(h => {
+    for(let i = 1; i <= 14; i++){
+      const day = iso(addDays(new Date(), -i));
+      if(day < h.created) return;
+      if(!isScheduled(h, day)) continue;
+      if(isDone(h, day) || isFrozen(h, day)) continue;
+
+      // the first missed day going backwards: protect it if the streak is worth it
+      if(state.freezes.pool > 0 && streakBefore(h, day) >= 2){
+        spendFreeze(h, day);
+        spent++;
+        lastName = h.name;
+        lastDay = day;
+      }
+      return;
+    }
+  });
+  if(spent){
+    saveState();
+    toast("❄ Streak freeze used" + (lastName ? " on " + lastName : "") +
+          (lastDay ? " · " + parse(lastDay).toLocaleDateString(undefined,{day:"numeric",month:"short"}) : ""));
+  }
+  return spent;
+}
+
+function freezeSheet(){
+  const f = state.freezes;
+  const used = Object.keys(f.used).length;
+  openSheet(sheet => {
+    sheet.innerHTML = `<div class="grab"></div>
+      <h2>Streak freezes</h2>
+      <div class="card" style="margin-bottom:14px">
+        <div style="font-size:34px;font-weight:800;color:#8fd8ff">❄ ${f.pool}<span style="font-size:15px;color:var(--muted)"> / ${f.max}</span></div>
+        <div class="small muted" style="margin-top:6px">Each one covers a single missed day, automatically, so the streak carries on as if you had done it.</div>
+      </div>
+      <div class="small muted" style="line-height:1.6">
+        · Spent without asking, the moment a day is missed.<br>
+        · Only days you were scheduled for count.<br>
+        · You earn one back every 7 days, up to ${f.max}.<br>
+        · ${used} ${used === 1 ? "freeze has" : "freezes have"} been used so far.
+      </div>
+      <div class="sheet-actions">
+        <button class="ghost" id="freezeClose">Close</button>
+      </div>`;
+    sheet.querySelector("#freezeClose").addEventListener("click", closeSheet);
+  });
+}
+
 function toggleHabit(h, day){
   day = day || todayStr();
   const target = (h.goal && h.goal.target) || 1;
   if(isDone(h, day)) delete h.log[day];
   else h.log[day] = target;
   saveState();
+  if(isDone(h, day)) celebrateIfMilestone(h);
+  syncRiskReminder();
+}
+
+/* ------------------------------------------------------------- celebrations */
+const MILESTONES = [3, 7, 14, 21, 30, 50, 75, 100, 150, 200, 365];
+
+function celebrateIfMilestone(h){
+  const n = streak(h);
+  if(MILESTONES.indexOf(n) < 0) return;
+
+  const key = h.id + ":" + n;
+  if(state.freezes.celebrated[key]) return;
+  state.freezes.celebrated[key] = todayStr();
+  saveState();
+
+  const lines = {
+    3: "The hardest part is over — three days in a row.",
+    7: "A full week. This is where a habit starts to feel like yours.",
+    14: "Two weeks. The routine is holding without much effort now.",
+    21: "Twenty-one days — the point people call automatic.",
+    30: "A month. That is not luck, it is a decision repeated.",
+    50: "Fifty. Most people never get this far.",
+    75: "Seventy-five days. This is part of who you are now.",
+    100: "One hundred days. Extraordinary, and quietly earned.",
+    150: "A hundred and fifty. Fewer people than you think have done this.",
+    200: "Two hundred days of showing up.",
+    365: "A year. Every single day of it."
+  };
+
+  showCelebration(h, n, lines[n] || "Keep going.");
+}
+
+function showCelebration(h, n, text){
+  const box = $("#celeb");
+  box.innerHTML = `<div class="inner">
+      <div class="flame">🔥</div>
+      <h2>${n} day streak</h2>
+      <p><b style="color:var(--text)">${escapeHtml(h.name)}</b><br>${escapeHtml(text)}</p>
+      <button id="celebOk">Keep it going</button>
+    </div>`;
+  box.classList.add("show");
+  burstConfetti(h.color);
+  box.querySelector("#celebOk").addEventListener("click", () => box.classList.remove("show"));
+}
+
+function burstConfetti(colour){
+  const layer = $("#confetti");
+  layer.innerHTML = "";
+  const palette = [colour || "#22d3ee", "#facc15", "#4ade80", "#f472b6", "#38bdf8"];
+  for(let i=0;i<46;i++){
+    const bit = document.createElement("i");
+    bit.style.left = Math.random()*100 + "vw";
+    bit.style.top = (-10 - Math.random()*20) + "vh";
+    bit.style.background = palette[i % palette.length];
+    bit.style.animationDelay = (Math.random()*0.5).toFixed(2) + "s";
+    bit.style.transform = "rotate(" + Math.floor(Math.random()*180) + "deg)";
+    layer.appendChild(bit);
+  }
+  layer.style.display = "block";
+  clearTimeout(layer._timer);
+  layer._timer = setTimeout(() => { layer.style.display = "none"; layer.innerHTML = ""; }, 2600);
 }
 
 function streak(h){
@@ -359,7 +581,7 @@ function streak(h){
     const key = iso(cursor);
     if(cursor < created) break;
     if(isScheduled(h, key)){
-      if(isDone(h, key)){
+      if(isDone(h, key) || isFrozen(h, key)){
         n++;
       }else if(key === todayStr()){
         // still time to finish today
@@ -476,8 +698,31 @@ function syncReminders(){
       if(isNaN(hh) || isNaN(mm)) return;
       bridge.schedule(h.id, hh, mm, h.name, "Time for " + h.name);
     });
+    syncRiskReminder();
     return true;
   }catch(e){ return false; }
+}
+
+/* An evening nudge in the spirit of Duolingo: only if something is still open. */
+const RISK_ID = "__risk";
+const RISK_HOUR = 20, RISK_MINUTE = 30;
+
+function syncRiskReminder(){
+  const bridge = remindersAvailable();
+  if(!bridge || typeof bridge.cancel !== "function") return;
+  try{
+    bridge.cancel(RISK_ID);
+    const left = scheduledToday().filter(h => !isDone(h));
+    if(!left.length) return;
+
+    const names = left.slice(0, 3).map(h => h.name).join(", ");
+    const more = left.length > 3 ? " and " + (left.length - 3) + " more" : "";
+    const title = left.length === 1 ? "Your streak ends at midnight" : left.length + " habits still open";
+    const body = left.length === 1
+      ? left[0].name + " — one tap and the streak survives."
+      : names + more + " — finish them before midnight.";
+    bridge.schedule(RISK_ID, RISK_HOUR, RISK_MINUTE, title, body);
+  }catch(e){}
 }
 
 /* =============================================================== rendering */
@@ -514,6 +759,13 @@ function renderHeader(){
   $("#greeting").textContent = part + (state.settings.name ? ", " + state.settings.name : "");
   $("#dateLine").textContent = new Date().toLocaleDateString(undefined,
     {weekday:"long", day:"numeric", month:"long"});
+
+  const chip = $("#freezeChip");
+  if(chip){
+    const pool = freezePool();
+    chip.innerHTML = "❄ <b>" + pool + "</b> " + (pool === 1 ? "freeze" : "freezes");
+    chip.classList.toggle("empty", pool === 0);
+  }
 
   const list = scheduledToday();
   const done = list.filter(h => isDone(h)).length;
@@ -660,7 +912,9 @@ function habitCard(h, dim){
 
   const side = el("div");
   const s = streak(h);
-  side.innerHTML = s ? `<div class="streak">🔥 ${s}</div>` : "";
+  const frozen = frozenInStreak(h);
+  side.innerHTML = (s ? `<div class="streak">🔥 ${s}</div>` : "") +
+                   (frozen ? `<div class="streak" style="color:#8fd8ff;font-size:11px">❄ ${frozen}</div>` : "");
 
   card.appendChild(tick);
   card.appendChild(body);
@@ -804,8 +1058,9 @@ function yearHeatmap(){
       const key = iso(day);
       const cell = el("i");
       const score = day > today ? null : dayScore(key);
-      if(score) cell.style.background = "rgba(34,211,238," + (0.16 + score*0.8).toFixed(2) + ")";
-      cell.title = key + (score ? " · " + pct(score) + "%" : "");
+      if(frozenOnDay(key)) cell.classList.add("frozen");
+      else if(score) cell.style.background = "rgba(34,211,238," + (0.16 + score*0.8).toFixed(2) + ")";
+      cell.title = key + (score ? " · " + pct(score) + "%" : "") + (frozenOnDay(key) ? " · frozen" : "");
       grid.appendChild(cell);
     }
   }
@@ -924,6 +1179,7 @@ function renderCalendar(){
     if(key > todayStr()) cell.classList.add("future");
     if(score) cell.style.background = `rgba(34,211,238,${(0.14 + score*0.78).toFixed(2)})`;
     if(score && score > .55) cell.style.color = "#04121c";
+    if(frozenOnDay(key)){ cell.classList.add("frozen"); cell.style.background = ""; cell.style.color = "#d3f0ff"; }
     cell.addEventListener("click", () => openDaySheet(key));
     grid.appendChild(cell);
   }
@@ -1983,6 +2239,13 @@ function fitToTabBar(){
 }
 window.addEventListener("resize", fitToTabBar);
 window.addEventListener("orientationchange", () => setTimeout(fitToTabBar, 120));
+
+/* Freezes are refreshed and applied before the first paint: a missed day
+   becomes an icy square instead of a broken streak. */
+refillFreezes();
+autoFreeze();
+
+$("#freezeChip").addEventListener("click", freezeSheet);
 
 renderAll();
 applyPendingMarks();
