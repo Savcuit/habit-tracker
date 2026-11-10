@@ -287,6 +287,12 @@ const PALETTE = ["#22d3ee","#38bdf8","#a78bfa","#f472b6","#facc15","#4ade80","#f
 const CATEGORIES = ["Health","Study","Sport","Work","Home","Mind"];
 const DAYS = ["M","T","W","T","F","S","S"];
 
+/* streak freezes: start with two, earn one a fortnight, never more than fourteen */
+const FREEZE_START = 2;      // you begin with two
+const FREEZE_MAX = 14;       // the ceiling
+const FREEZE_EVERY_DAYS = 14; // one earned per fortnight
+
+
 /* ================================================================== helpers */
 const $ = sel => document.querySelector(sel);
 const el = (tag, cls, html) => { const n = document.createElement(tag); if(cls) n.className = cls; if(html!==undefined) n.innerHTML = html; return n; };
@@ -327,7 +333,7 @@ let calMonth = new Date();
 function defaultState(){ return { version: 2, habits: [], freezes: blankFreezes(), settings: { accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"" } }; }
 
 function blankFreezes(){
-  return { pool: 2, max: 2, used: {}, lastRefill: todayStr(), celebrated: {} };
+  return { pool: FREEZE_START, max: FREEZE_MAX, used: {}, lastRefill: todayStr(), celebrated: {} };
 }
 
 function normalise(data){
@@ -335,8 +341,9 @@ function normalise(data){
   data.freezes = Object.assign(blankFreezes(), data.freezes||{});
   data.freezes.used = data.freezes.used || {};
   data.freezes.celebrated = data.freezes.celebrated || {};
-  if(typeof data.freezes.pool !== "number") data.freezes.pool = 2;
-  if(typeof data.freezes.max !== "number") data.freezes.max = 2;
+  if(typeof data.freezes.pool !== "number") data.freezes.pool = FREEZE_START;
+  data.freezes.max = FREEZE_MAX;
+  if(data.freezes.pool > FREEZE_MAX) data.freezes.pool = FREEZE_MAX;
   data.habits.forEach(h => {
     h.schedule = Array.isArray(h.schedule) && h.schedule.length ? h.schedule : [0,1,2,3,4,5,6];
     h.goal = h.goal || { type:"check", target:1, unit:"" };
@@ -418,11 +425,15 @@ function refillFreezes(){
   const f = state.freezes;
   if(!f.lastRefill) f.lastRefill = todayStr();
   const gap = daysBetween(f.lastRefill, todayStr());
-  if(gap < 7) return 0;
-  const gain = Math.min(f.max - f.pool, Math.floor(gap / 7));
+  if(gap < FREEZE_EVERY_DAYS) return 0;
+  const earned = Math.floor(gap / FREEZE_EVERY_DAYS);
+  const gain = Math.min(f.max - f.pool, earned);
+  if(earned > 0){
+    // the clock keeps running even when you are already at the ceiling
+    f.lastRefill = iso(addDays(parse(f.lastRefill), earned * FREEZE_EVERY_DAYS));
+  }
   if(gain > 0){
     f.pool += gain;
-    f.lastRefill = iso(addDays(parse(f.lastRefill), Math.floor(gap / 7) * 7));
     return gain;
   }
   return 0;
@@ -505,7 +516,7 @@ function freezeSheet(){
       <div class="small muted" style="line-height:1.6">
         · Spent without asking, the moment a day is missed.<br>
         · Only days you were scheduled for count.<br>
-        · You earn one back every 7 days, up to ${f.max}.<br>
+        · One earned every 14 days, up to ${f.max}.<br>
         · ${used} ${used === 1 ? "freeze has" : "freezes have"} been used so far.
       </div>
       <div class="sheet-actions">
@@ -2259,6 +2270,7 @@ window.addEventListener("orientationchange", () => setTimeout(fitToTabBar, 120))
    becomes an icy square instead of a broken streak. */
 refillFreezes();
 autoFreeze();
+saveState();          // persist the refill, and lift old saves to the new ceiling
 
 $("#freezeChip").addEventListener("click", freezeSheet);
 

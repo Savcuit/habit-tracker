@@ -344,7 +344,7 @@ Two freezes, in the spirit of Duolingo, so an accidental day does not erase mont
 - A frozen day is drawn in **icy blue with a ❄** in the calendar and the year heatmap, so it is
   never mistaken for a day you actually did.
 - The habit card shows `🔥 12` with `❄ 1` beneath it when part of that streak was protected.
-- **One freeze is earned back every seven days**, up to the maximum of two.
+- **One freeze is earned every fourteen days**, up to a maximum of fourteen.
 - The `❄ n freezes` chip under the date opens a short explanation of the rules.
 - A freeze is only spent when the streak before the missed day is worth at least two — a habit you
   have barely started is not protected, so the freezes are not wasted.
@@ -358,3 +358,14 @@ Notifications:
   with confetti and a line of encouragement. Each milestone is celebrated once per habit.
 
 Android 5.0 (`versionCode 17`) and the web build in `docs/` both carry it.
+
+## Version 5.1 — one a fortnight, up to fourteen
+
+The freeze economy, adjusted as asked:
+
+- you begin with **two**;
+- you earn **one more every 14 days**, whether or not you used any;
+- the ceiling is **fourteen**, and while you sit at fourteen the fortnightly clock keeps moving,
+  so using three at once does not reset your progress towards the next one.
+
+Existing saves are lifted to the new ceiling automatically; the count itself is untouched.
