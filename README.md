@@ -369,3 +369,25 @@ The freeze economy, adjusted as asked:
   so using three at once does not reset your progress towards the next one.
 
 Existing saves are lifted to the new ceiling automatically; the count itself is untouched.
+
+## Version 6.0 — Pip, and colours that follow the weather
+
+A guide, and a choice of mood for the app.
+
+- **Pip** sits at the top of Today and says something useful each time you open it: what is left
+  today, that you should start with the task you least want to do, that a miss will cost a freeze,
+  or simply that everything is done and you should put the phone down. The bubble follows the
+  accent colour of the theme.
+- **First launch asks how you want it to look.** *Casual* is the cyan one. *Cosy* is warm and soft —
+  cream and peach by day, deep indigo at night, and its accent colour is chosen from today's sky:
+  amber for clear, slate for cloud, blue for rain, ice for snow, violet for storms.
+- **Temperature nudges the palette.** Below 6 °C the accent leans cold; above 26 °C it leans warm.
+- Cosy asks **where you are**, once. The Android app asks for coarse location permission; the web
+  version uses the browser's. If permission is refused, it asks for a town instead. Coordinates go
+  to **Open-Meteo** and nowhere else, and the answer is cached for thirty minutes.
+- Both can be changed at any time in **More → Pip & colours**, where the current weather and city
+  are shown, with buttons to refresh or change the place.
+
+Verified in a real browser: the welcome appears on a fresh install, choosing Cosy set the cream
+palette, rain at 11 °C produced the blue accent `#5B8DEF`, choosing a city fetched the weather and
+stored it, and switching back to Casual restored midnight with the cyan accent.

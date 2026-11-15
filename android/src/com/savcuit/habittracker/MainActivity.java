@@ -54,6 +54,7 @@ public class MainActivity extends Activity implements FileChooserClient.Host {
         web.addJavascriptInterface(new Reminders(this), "AndroidReminders");
         web.addJavascriptInterface(new Backup(this), "AndroidBackup");
         web.addJavascriptInterface(new Steps(this), "AndroidSteps");
+        web.addJavascriptInterface(new Geo(this), "AndroidGeo");
 
         // Without a chrome client the page's file picker never opens, so Import did nothing.
         web.setWebChromeClient(new FileChooserClient(this));

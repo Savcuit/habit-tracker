@@ -208,6 +208,33 @@
   .celeb button{width:100%;padding:15px;border-radius:14px;background:var(--accent);
                 color:#04121c;font-weight:800;font-size:15px;}
 
+  /* ---- Pip, the guide ---------------------------------------------------- */
+  .mascot{display:flex;gap:12px;align-items:flex-start;margin:2px 0 14px;}
+  .mascot .pet{flex:0 0 56px;width:56px;height:56px;animation:bob 3.4s ease-in-out infinite;}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  .mascot .bubble{position:relative;flex:1;background:var(--panel);border:1px solid var(--line);
+                  border-radius:14px;padding:11px 13px;font-size:13px;line-height:1.45;color:var(--text);}
+  .mascot .bubble:before{content:"";position:absolute;left:-6px;top:18px;width:11px;height:11px;
+                         background:var(--panel);border-left:1px solid var(--line);border-bottom:1px solid var(--line);
+                         transform:rotate(45deg);}
+  .mascot .bubble b{color:var(--accent);}
+  .mascot .bubble .name{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+                        color:var(--dim);font-weight:800;margin-bottom:3px;}
+
+  /* ---- the welcome / mode chooser --------------------------------------- */
+  #welcome{position:fixed;inset:0;z-index:70;display:none;background:var(--bg);
+           padding:26px 20px;overflow-y:auto;}
+  #welcome.show{display:block;}
+  #welcome h1{font-size:24px;margin:6px 0 4px;}
+  #welcome .lead{color:var(--muted);font-size:13.5px;line-height:1.5;margin-bottom:20px;}
+  .choice{border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px;
+          background:var(--panel);cursor:pointer;transition:border-color .15s ease, transform .1s ease;}
+  .choice:active{transform:scale(.99);}
+  .choice h3{font-size:15px;margin-bottom:4px;}
+  .choice p{font-size:12.5px;color:var(--muted);line-height:1.5;}
+  .swatchrow{display:flex;gap:6px;margin-top:10px;}
+  .swatchrow i{width:22px;height:22px;border-radius:7px;}
+
   #toast{
     position:fixed;left:50%;bottom:90px;transform:translate(-50%,20px);z-index:40;
     background:#132033;border:1px solid var(--line);border-radius:12px;
@@ -258,6 +285,7 @@
   </div>
 </nav>
 
+<div id="welcome"></div>
 <div class="backdrop" id="backdrop"></div>
 <div class="sheet" id="sheet"></div>
 <div id="confetti"></div>
@@ -315,14 +343,14 @@ let state = loadState();
 let statsRange = 30;
 let calMonth = new Date();
 
-function defaultState(){ return { version: 2, habits: [], freezes: blankFreezes(), settings: { accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"" } }; }
+function defaultState(){ return { version: 2, habits: [], freezes: blankFreezes(), settings: { accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"", mode:"", city:"", weather:null } }; }
 
 function blankFreezes(){
   return { pool: FREEZE_START, max: FREEZE_MAX, used: {}, lastRefill: todayStr(), celebrated: {} };
 }
 
 function normalise(data){
-  data.settings = Object.assign({ accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"" }, data.settings||{});
+  data.settings = Object.assign({ accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"", mode:"", city:"", weather:null }, data.settings||{});
   data.freezes = Object.assign(blankFreezes(), data.freezes||{});
   data.freezes.used = data.freezes.used || {};
   data.freezes.celebrated = data.freezes.celebrated || {};
@@ -751,11 +779,254 @@ function applyStepGoal(){
   if(changed) saveState();
 }
 
+
+/* ======================================================== Pip, the guide */
+const PIP = "Pip";
+const WEATHER_TTL = 30 * 60 * 1000;
+
+function pipSvg(colour){
+  return '<svg class="pet" viewBox="0 0 64 64" aria-hidden="true">'
+    + '<ellipse cx="32" cy="57" rx="14" ry="2.6" fill="' + colour + '" opacity=".16"/>'
+    + '<path d="M16 20 12 8l10 5" fill="' + colour + '" fill-opacity=".22" stroke="' + colour + '" stroke-width="2.2" stroke-linejoin="round"/>'
+    + '<path d="M48 20 52 8l-10 5" fill="' + colour + '" fill-opacity=".22" stroke="' + colour + '" stroke-width="2.2" stroke-linejoin="round"/>'
+    + '<path d="M32 12c10 0 18 8 18 17 0 10-8 17-18 17s-18-7-18-17c0-9 8-17 18-17Z" fill="' + colour + '" fill-opacity=".18" stroke="' + colour + '" stroke-width="2.2"/>'
+    + '<circle cx="25" cy="30" r="2.6" fill="' + colour + '"/>'
+    + '<circle cx="39" cy="30" r="2.6" fill="' + colour + '"/>'
+    + '<path d="M29 37c1.7 1.9 4.3 1.9 6 0" stroke="' + colour + '" stroke-width="2" stroke-linecap="round" fill="none"/>'
+    + '</svg>';
+}
+
+function mascotTip(){
+  const list = scheduledToday();
+  const done = list.filter(isDone).length;
+  const hour = new Date().getHours();
+  if(!state.habits.length){
+    return "Hello — I'm <b>" + PIP + "</b>. Tap a starter below, or <b>New habit</b>, and we'll begin with one small thing you could manage even on a poor day.";
+  }
+  if(!list.length){
+    return "Nothing is scheduled today. That is allowed — or add a weekend habit if you would rather keep the rhythm going.";
+  }
+  if(done === list.length){
+    return "All <b>" + done + "</b> done. Put the phone down and enjoy the evening; I shall keep watch over the streak.";
+  }
+  const left = list.length - done;
+  if(done === 0 && hour < 12){
+    return "Morning. <b>" + list.length + "</b> thing" + (list.length === 1 ? "" : "s") + " today — start with the one you are least looking forward to.";
+  }
+  if(hour >= 20){
+    return "<b>" + left + "</b> still open and the day is closing. A miss costs a freeze; you have " + freezePool() + ".";
+  }
+  if(done === 0){
+    return "<b>" + left + "</b> waiting. Pick the smallest one — momentum is easier to borrow than to build.";
+  }
+  return "<b>" + done + "</b> done, <b>" + left + "</b> to go. Half a habit is still a habit.";
+}
+
+function renderMascot(){
+  const host = document.getElementById("mascotHost");
+  if(!host) return;
+  const colour = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#22d3ee";
+  host.innerHTML = pipSvg(colour)
+    + '<div class="bubble"><span class="name">' + PIP + '</span>' + mascotTip() + '</div>';
+}
+
+/* ================================================== money: colours, weather */
+function hexBlend(a, b, t){
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const mix = (x, y) => Math.round(x + (y - x) * t);
+  const r = mix((pa >> 16) & 255, (pb >> 16) & 255);
+  const g = mix((pa >> 8) & 255, (pb >> 8) & 255);
+  const bl = mix(pa & 255, pb & 255);
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
+}
+
+function cosyPalette(){
+  const w = state.settings.weather || {};
+  const isDay = w.isDay === undefined ? true : !!w.isDay;
+  const code = typeof w.code === "number" ? w.code : 3;
+  const temp = typeof w.temp === "number" ? w.temp : 18;
+
+  let accent;
+  if(code <= 1)        accent = isDay ? "#E08A4B" : "#7AA2FF";
+  else if(code === 2)  accent = isDay ? "#C98F5F" : "#8FA6D8";
+  else if(code === 3)  accent = "#93A79E";
+  else if(code <= 48)  accent = "#8D9AA8";
+  else if(code <= 67)  accent = "#5B8DEF";
+  else if(code <= 77)  accent = "#6FC3E8";
+  else if(code <= 82)  accent = "#4E7FD8";
+  else                 accent = "#8A6CF0";
+
+  if(temp <= 6)  accent = hexBlend(accent, "#6FA8FF", 0.35);
+  if(temp >= 26) accent = hexBlend(accent, "#FF9A5A", 0.35);
+
+  if(isDay){
+    return { bg:"#FDF6EE", panel:"#FFFCF8", panel2:"#F6ECDF", line:"#E7D6C4",
+             text:"#3A2F2A", muted:"#8A7466", dim:"#B29C8B", accent:accent, nav:"rgba(255,252,248,.96)" };
+  }
+  return { bg:"#131A2A", panel:"#1B2437", panel2:"#212C43", line:"#2E3A56",
+           text:"#E9EEF8", muted:"#97A3BE", dim:"#6D7A96", accent:accent, nav:"rgba(19,26,42,.96)" };
+}
+
+function applyThemeMode(){
+  const root = document.documentElement;
+  const mode = state.settings.mode || "casual";
+  const vars = ["--bg","--panel","--panel2","--line","--text","--muted","--dim","--accent","--nav"];
+  if(mode === "cosy"){
+    const p = cosyPalette();
+    root.setAttribute("data-theme", "cosy");
+    vars.forEach(k => root.style.removeProperty(k));
+    root.style.setProperty("--bg", p.bg);
+    root.style.setProperty("--panel", p.panel);
+    root.style.setProperty("--panel2", p.panel2);
+    root.style.setProperty("--line", p.line);
+    root.style.setProperty("--text", p.text);
+    root.style.setProperty("--muted", p.muted);
+    root.style.setProperty("--dim", p.dim);
+    root.style.setProperty("--accent", p.accent);
+    root.style.setProperty("--nav", p.nav);
+  } else {
+    vars.forEach(k => root.style.removeProperty(k));
+    root.setAttribute("data-theme", state.settings.theme || "midnight");
+    root.style.setProperty("--accent", state.settings.accent || "#22d3ee");
+  }
+}
+
+
+function descriptionOfSky(code){
+  if(code <= 1) return "clear";
+  if(code === 2) return "partly cloudy";
+  if(code === 3) return "overcast";
+  if(code <= 48) return "fog";
+  if(code <= 57) return "drizzle";
+  if(code <= 67) return "rain";
+  if(code <= 77) return "snow";
+  if(code <= 82) return "showers";
+  return "storm";
+}
+
+function weatherFresh(){
+  const w = state.settings.weather;
+  return w && w.at && (Date.now() - w.at) < WEATHER_TTL;
+}
+
+function askLocation(cb){
+  const geo = (typeof window.AndroidGeo !== "undefined") ? window.AndroidGeo : null;
+  if(geo && typeof geo.lastLocation === "function"){
+    try{
+      const raw = geo.lastLocation();
+      if(raw && raw.indexOf(",") > 0){
+        const parts = raw.split(",");
+        state.settings.lat = parseFloat(parts[0]);
+        state.settings.lon = parseFloat(parts[1]);
+        saveState(); cb(true); return;
+      }
+      if(geo.permissionNeeded && geo.permissionNeeded()){ geo.requestPermission(); cb(false); return; }
+    }catch(e){}
+  }
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      pos => { state.settings.lat = pos.coords.latitude; state.settings.lon = pos.coords.longitude; saveState(); cb(true); },
+      () => cb(false),
+      { timeout: 8000, maximumAge: 600000 }
+    );
+    return;
+  }
+  cb(false);
+}
+
+function refreshWeather(force){
+  if(state.settings.mode !== "cosy") return;
+  if(!force && weatherFresh()){ applyThemeMode(); renderMascot(); return; }
+
+  const done = (lat, lon) => {
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon
+      + "&current=temperature_2m,weather_code,is_day&timezone=auto";
+    fetch(url).then(r => r.json()).then(j => {
+      const cur = j && j.current;
+      if(!cur) return;
+      state.settings.weather = { temp: cur.temperature_2m, code: cur.weather_code, isDay: cur.is_day === 1, at: Date.now() };
+      saveState(); applyThemeMode(); renderMascot();
+      if(!$("#page-settings").hidden) renderSettings();
+    }).catch(() => {});
+  };
+
+  if(typeof state.settings.lat === "number" && typeof state.settings.lon === "number"){
+    done(state.settings.lat, state.settings.lon); return;
+  }
+  if(state.settings.city){
+    fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + encodeURIComponent(state.settings.city))
+      .then(r => r.json())
+      .then(j => {
+        const hit = j && j.results && j.results[0];
+        if(!hit) return;
+        state.settings.lat = hit.latitude; state.settings.lon = hit.longitude;
+        saveState(); done(hit.latitude, hit.longitude);
+      }).catch(() => {});
+  }
+}
+
+/* ============================================================ the welcome */
+function chooseCity(onDone){
+  openSheet(sheet => {
+    sheet.innerHTML = '<div class="grab"></div><h2>Where are you?</h2>'
+      + '<div class="small muted" style="margin-bottom:14px">A town or city is enough — it is used only to fetch the weather.</div>'
+      + '<input type="text" id="cityIn" placeholder="Athens" autocomplete="off">'
+      + '<div class="sheet-actions"><button class="primary" id="cityOk">Use this</button></div>';
+    sheet.querySelector("#cityOk").addEventListener("click", () => {
+      const v = (sheet.querySelector("#cityIn").value || "").trim();
+      if(!v) return;
+      state.settings.city = v; state.settings.lat = undefined; state.settings.lon = undefined;
+      saveState(); closeSheet(); if(onDone) onDone();
+    });
+  });
+  setTimeout(() => { const i = document.getElementById("cityIn"); if(i) i.focus(); }, 260);
+}
+
+function welcome(){
+  const box = document.getElementById("welcome");
+  if(!box) return;
+  box.innerHTML = '<div style="max-width:520px;margin:0 auto">'
+    + '<div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">' + pipSvg("#22d3ee") + '<h1>Hello — I am ' + PIP + '</h1></div>'
+    + '<div class="lead">I shall walk you through this. First, choose how you would like it to look. You can change this at any time in <b>More</b>.</div>'
+    + '<div class="choice" data-mode="casual"><h3>Casual</h3><p>The cyan one — dark, quiet, made for the evening.</p>'
+    +   '<div class="swatchrow"><i style="background:#070d18"></i><i style="background:#0e1727"></i><i style="background:#22d3ee"></i></div></div>'
+    + '<div class="choice" data-mode="cosy"><h3>Cosy</h3><p>Warm colours that follow the day — the light, the weather, the temperature where you are.</p>'
+    +   '<div class="swatchrow"><i style="background:#FDF6EE"></i><i style="background:#F6ECDF"></i><i style="background:#E08A4B"></i><i style="background:#5B8DEF"></i><i style="background:#8A6CF0"></i></div></div>'
+    + '<div class="small muted" style="margin-top:14px;line-height:1.5">Cosy asks where you are, once, so it can fetch today\'s temperature and sky. Nothing leaves your phone except the coordinates in that one request.</div>'
+    + '</div>';
+  box.classList.add("show");
+  applyThemeMode();
+
+  box.querySelectorAll(".choice").forEach(card => {
+    card.addEventListener("click", () => {
+      const mode = card.dataset.mode;
+      state.settings.mode = mode;
+      saveState();
+      applyThemeMode();
+      if(mode === "cosy"){
+        askLocation(ok => {
+          if(!ok) chooseCity(() => refreshWeather(true));
+          else refreshWeather(true);
+        });
+      }
+      box.classList.remove("show");
+      renderAll();
+      if(mode === "cosy") setTimeout(() => refreshWeather(true), 600);
+    });
+  });
+}
+
+function maybeWelcome(){
+  if(!state.settings.mode){
+    applyThemeMode();
+    welcome();
+  }
+}
+
 function renderAll(){
   if(usesSteps()) refreshSteps();
   applyStepGoal();
-  document.documentElement.style.setProperty("--accent", state.settings.accent || "#22d3ee");
-  document.documentElement.setAttribute("data-theme", state.settings.theme || "midnight");
+  applyThemeMode();
   renderHeader();
   renderToday();
   if(!$("#page-stats").hidden) renderStats();
@@ -792,6 +1063,11 @@ function renderHeader(){
 function renderToday(){
   const host = $("#page-today");
   host.innerHTML = "";
+
+  const pet = el("div", "mascot");
+  pet.id = "mascotHost";
+  host.appendChild(pet);
+  renderMascot();
 
   if(!state.habits.length){
     const empty = el("div", "empty");
@@ -1243,6 +1519,41 @@ function renderSettings(){
   host.appendChild(accent);
 
   host.appendChild(reminderCard());
+
+  const pipCard = el("div", "card");
+  pipCard.style.marginTop = "12px";
+  const w = state.settings.weather;
+  const sky = w
+    ? Math.round(w.temp) + "\u00B0C \u00B7 " + descriptionOfSky(w.code) + (w.isDay ? " \u00B7 day" : " \u00B7 night")
+    : "no weather yet";
+  pipCard.innerHTML = `<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:700;margin-bottom:10px">Pip &amp; colours</div>
+    <div class="small muted" style="margin-bottom:10px;line-height:1.5">Pip is the little guide at the top of Today. Choose how the app looks.</div>`;
+  const modeSeg = el("div", "seg");
+  [["casual","Casual"],["cosy","Cosy"]].forEach(([value, label]) => {
+    const b = el("button", (state.settings.mode || "casual") === value ? "on" : "", label);
+    b.addEventListener("click", () => {
+      state.settings.mode = value;
+      saveState(); applyThemeMode(); renderAll(); renderSettings();
+      if(value === "cosy"){
+        askLocation(ok => { if(!ok) chooseCity(() => refreshWeather(true)); else refreshWeather(true); });
+      }
+    });
+    modeSeg.appendChild(b);
+  });
+  pipCard.appendChild(modeSeg);
+  pipCard.insertAdjacentHTML("beforeend",
+    `<div class="small" style="color:var(--muted);margin-top:12px">${sky}</div>`
+    + `<div class="small" style="color:var(--dim);margin-top:2px">${state.settings.city ? "City: " + escapeHtml(state.settings.city) : "Location: not set"}</div>`);
+  if((state.settings.mode || "casual") === "cosy"){
+    const wrow = el("div");
+    wrow.style.cssText = "display:flex;gap:10px;margin-top:12px";
+    wrow.innerHTML = `<button class="ghost" id="wRefresh" style="flex:1">Refresh weather</button>
+                      <button class="ghost" id="wCity" style="flex:1">Change place</button>`;
+    pipCard.appendChild(wrow);
+    wrow.querySelector("#wRefresh").addEventListener("click", () => { refreshWeather(true); toast("Fetching the weather"); });
+    wrow.querySelector("#wCity").addEventListener("click", () => chooseCity(() => refreshWeather(true)));
+  }
+  host.appendChild(pipCard);
 
   const themeCard = el("div", "card");
   themeCard.style.marginTop = "12px";
@@ -2258,6 +2569,9 @@ autoFreeze();
 saveState();          // persist the refill, and lift old saves to the new ceiling
 
 $("#freezeChip").addEventListener("click", freezeSheet);
+
+maybeWelcome();
+if((state.settings.mode || "") === "cosy") setTimeout(() => refreshWeather(false), 400);
 
 renderAll();
 applyPendingMarks();
