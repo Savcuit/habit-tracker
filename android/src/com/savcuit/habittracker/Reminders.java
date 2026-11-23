@@ -59,6 +59,14 @@ public class Reminders {
         return String.format("%02d:%02d", c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE));
     }
 
+
+    /** One line of text for the home-screen widget, then a redraw. */
+    @JavascriptInterface
+    public void setWidget(String state) {
+        prefs.edit().putString("widget_state", state == null ? "" : state).apply();
+        TodayWidget.refresh(activity);
+    }
+
     @JavascriptInterface
     public boolean supported() {
         return true;

@@ -411,3 +411,23 @@ tuned out.
 
 Verified with a stubbed Android bridge in a real browser: the card renders, the toggle calls through
 to the phone, the next-nudge time appears, and today's open habits are passed across as text.
+
+## Version 8.0 — the things the good ones have
+
+Researched against current habit apps (HabitKit, Streaks, Habitify, Strides, Loop, jeden.day), the
+three features cited most often and missing here are now in.
+
+**Home-screen widget.** A dark panel showing today's count, a bar, and up to three habits still open.
+Tap it to open the app. Add it from the launcher's widget list; the page writes the state to the
+phone each time it redraws, so the widget follows the app without opening it.
+
+**Times a week, not fixed days.** A habit can now be "3 times a week" instead of Monday/Wednesday/
+Friday. Any days count, the card shows `2/3 this week`, and the streak counts **consecutive weeks
+meeting the target** — displayed with a small `w`, because a weekly habit's streak is weeks, not days.
+
+**Pause.** *Pause for a week* (or resume) in the habit sheet. While paused the habit is not due, is
+not counted as missed, and does not break a streak — which is what Streaks calls a holiday mode and
+what most trackers get wrong.
+
+Verified in a browser: a 3×/week habit showed `0/3 this week` and a two-week streak; a paused habit
+left today's list entirely; the widget payload is sent to the phone on every redraw.

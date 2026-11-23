@@ -475,6 +475,7 @@ function frozenInStreak(h){
   while(guard++ < 2000){
     const key = iso(cursor);
     if(cursor < created) break;
+    if(isPaused(h) && key <= (h.pausedUntil || "")){ cursor = addDays(cursor, -1); continue; }
     if(isScheduled(h, key)){
       if(isDone(h, key) || isFrozen(h, key)){
         if(isFrozen(h, key)) n++;
@@ -625,6 +626,7 @@ function burstConfetti(colour){
 }
 
 function streak(h){
+  if(h.weekly) return weekStreak(h);
   // Only days the habit is scheduled for count; today being unfinished does not break it.
   let n = 0;
   const created = parse(h.created);
@@ -634,6 +636,7 @@ function streak(h){
   while(guard++ < 2000){
     const key = iso(cursor);
     if(cursor < created) break;
+    if(isPaused(h) && key <= (h.pausedUntil || "")){ cursor = addDays(cursor, -1); continue; }
     if(isScheduled(h, key)){
       if(isDone(h, key) || isFrozen(h, key)){
         n++;
@@ -679,7 +682,61 @@ function rate(h, windowDays){
   return total ? hits/total : 0;
 }
 
-function scheduledToday(){ return state.habits.filter(h => isScheduled(h, todayStr())); }
+
+/* ------------------------------------------------- flexible weeks and pause */
+/* A habit may be "3 times a week" instead of fixed days, and it may be paused
+   for a holiday, during which nothing is counted and no streak is broken. */
+
+function weekStart(day){
+  const d = parse(day);
+  const monday = addDays(d, -mondayIndex(d));
+  return iso(monday);
+}
+
+function weeklyDone(h, weekKey){
+  let n = 0;
+  for(let i = 0; i < 7; i++){
+    const key = iso(addDays(parse(weekKey), i));
+    if(isDone(h, key)) n++;
+  }
+  return n;
+}
+
+function isPaused(h){
+  return !!h.pausedUntil && h.pausedUntil >= todayStr();
+}
+
+function isDue(h, day){
+  if(isPaused(h)) return false;
+  if(!h.weekly) return isScheduled(h, day);
+  const week = weekStart(day);
+  return weeklyDone(h, week) < h.weekly || isDone(h, day);
+}
+
+function weekStreak(h){
+  const target = h.weekly || 0;
+  if(!target) return 0;
+  let weeks = 0;
+  let cursor = weekStart(todayStr());
+  let guard = 0;
+  while(guard++ < 260){
+    const done = weeklyDone(h, cursor);
+    const isThisWeek = cursor === weekStart(todayStr());
+    if(done >= target) weeks++;
+    else if(isThisWeek){ /* the week is not over yet */ }
+    else break;
+    cursor = iso(addDays(parse(cursor), -7));
+    if(cursor < h.created) break;
+  }
+  return weeks;
+}
+
+function weeklyLabel(h){
+  if(!h.weekly) return "";
+  return weeklyDone(h, weekStart(todayStr())) + "/" + h.weekly + " this week";
+}
+
+function scheduledToday(){ return state.habits.filter(h => isDue(h, todayStr())); }
 
 function dayScore(day){
   const list = state.habits.filter(h => isScheduled(h, day) && h.created <= day);
@@ -1042,6 +1099,16 @@ function maybeWelcome(){
   }
 }
 
+
+function pushWidget(){
+  const bridge = remindersAvailable();
+  if(!bridge || typeof bridge.setWidget !== "function") return;
+  const list = scheduledToday();
+  const done = list.filter(h => isDone(h)).length;
+  const open = list.filter(h => !isDone(h)).slice(0, 3).map(h => h.name);
+  bridge.setWidget(done + "|" + list.length + "|" + (open[0] || "") + "|" + (open[1] || "") + "|" + (open[2] || ""));
+}
+
 function renderAll(){
   if(usesSteps()) refreshSteps();
   applyStepGoal();
@@ -1052,6 +1119,7 @@ function renderAll(){
   if(!$("#page-calendar").hidden) renderCalendar();
   if(!$("#page-train").hidden) renderTrain();
   if(!$("#page-settings").hidden) renderSettings();
+  pushWidget();
 }
 
 function renderHeader(){
@@ -1204,10 +1272,12 @@ function habitCard(h, dim){
       ? `${valueOn(h, todayStr())} / ${h.goal.target} ${h.goal.unit || "times"}`
       : (done ? "Completed today" : "Tap to mark done");
   const reminder = h.reminder ? `<span style="color:var(--accent)">⏰ ${h.reminder}</span>` : "";
+  const pattern = h.weekly ? `<span>${weeklyLabel(h)}</span>` : "";
+  const pausedChip = isPaused(h) ? `<span style="color:var(--warn)">⏸ paused</span>` : "";
   body.innerHTML = `
     <div class="name">${escapeHtml(h.name)}</div>
     <div class="meta"><span class="chip" style="color:${h.color};border-color:${h.color}44">${escapeHtml(h.category)}</span>
-      <span>${meta}</span>${reminder}</div>`;
+      <span>${meta}</span>${reminder}${pattern}${pausedChip}</div>`;
 
   const dots = el("div", "dots");
   for(let i=0;i<7;i++){
@@ -1219,7 +1289,8 @@ function habitCard(h, dim){
   const side = el("div");
   const s = streak(h);
   const frozen = frozenInStreak(h);
-  side.innerHTML = (s ? `<div class="streak">🔥 ${s}</div>` : "") +
+  if(h.weekly) side.innerHTML = `<div class="streak">🔥 ${s}<span style="font-size:10px;color:var(--muted)">w</span></div>`;
+  else side.innerHTML = (s ? `<div class="streak">🔥 ${s}</div>` : "") +
                    (frozen ? `<div class="streak" style="color:#8fd8ff;font-size:11px">❄ ${frozen}</div>` : "");
 
   card.appendChild(tick);
@@ -2312,6 +2383,33 @@ function openHabitSheet(habit){
       placeholder="e.g. Push ups — 30" value="${escapeHtml(draft.name)}">`;
     sheet.appendChild(nameField);
 
+    const patternField = el("div", "field");
+    patternField.innerHTML = `<label>How often</label>`;
+    const patternSeg = el("div", "seg");
+    const btnDaily = el("button", draft.weekly ? "" : "on", "Certain days");
+    const btnWeekly = el("button", draft.weekly ? "on" : "", "Times a week");
+    patternSeg.appendChild(btnDaily);
+    patternSeg.appendChild(btnWeekly);
+    patternField.appendChild(patternSeg);
+
+    const weekWrap = el("div");
+    weekWrap.style.cssText = "display:flex;gap:10px;align-items:center;margin-top:10px;" + (draft.weekly ? "" : "display:none");
+    weekWrap.innerHTML = `<input type="number" id="hWeekly" min="1" max="7" value="${draft.weekly || 3}" style="flex:0 0 90px">
+      <span class="small muted" style="flex:1">times each week, any days you like</span>`;
+    patternField.appendChild(weekWrap);
+    sheet.appendChild(patternField);
+
+    function pickPattern(weekly){
+      draft.weekly = weekly ? Math.max(1, Math.min(7, parseInt(sheet.querySelector("#hWeekly").value || "3", 10))) : 0;
+      btnDaily.classList.toggle("on", !weekly);
+      btnWeekly.classList.toggle("on", weekly);
+      weekWrap.style.display = weekly ? "flex" : "none";
+      daysField.style.display = weekly ? "none" : "block";
+    }
+    btnDaily.addEventListener("click", () => pickPattern(false));
+    btnWeekly.addEventListener("click", () => pickPattern(true));
+    weekWrap.querySelector("#hWeekly").addEventListener("change", () => { if(draft.weekly) pickPattern(true); });
+
     const daysField = el("div", "field");
     daysField.innerHTML = `<label>Repeat on</label>`;
     const daysWrap = el("div", "days");
@@ -2423,6 +2521,17 @@ function openHabitSheet(habit){
     sheet.appendChild(actions);
 
     if(habit){
+      const pause = el("button", "ghost");
+      const paused = isPaused(habit);
+      pause.textContent = paused ? "Resume today" : "Pause for a week";
+      pause.style.cssText = "width:100%;margin-top:10px";
+      pause.addEventListener("click", () => {
+        habit.pausedUntil = paused ? "" : iso(addDays(new Date(), 6));
+        saveState(); closeSheet(); renderAll();
+        toast(paused ? "Resumed" : "Paused until " + parse(habit.pausedUntil).toLocaleDateString(undefined,{day:"numeric",month:"short"}));
+      });
+      sheet.appendChild(pause);
+
       const del = el("button", "ghost danger");
       del.textContent = "Delete habit";
       del.style.cssText = "width:100%;margin-top:10px";
@@ -2439,7 +2548,13 @@ function openHabitSheet(habit){
     sheet.querySelector("#saveHabit").addEventListener("click", () => {
       const name = sheet.querySelector("#hName").value.trim();
       if(!name){ toast("Give it a name first"); return; }
-      if(!draft.schedule.length){ toast("Pick at least one day"); return; }
+      if(draft.weekly){
+        draft.weekly = Math.max(1, Math.min(7, parseInt(sheet.querySelector("#hWeekly").value || "3", 10)));
+        if(!draft.schedule.length) draft.schedule = [0,1,2,3,4,5,6];
+      }else{
+        draft.weekly = 0;
+        if(!draft.schedule.length){ toast("Pick at least one day"); return; }
+      }
       draft.name = name;
       draft.reminder = sheet.querySelector("#hReminder").value || "";
       if(draft.goal.type === "count"){
