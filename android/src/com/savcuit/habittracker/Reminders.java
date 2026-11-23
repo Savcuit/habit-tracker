@@ -30,6 +30,35 @@ public class Reminders {
         this.prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
+
+    /* ---- surprise nudges ------------------------------------------------- */
+
+    @JavascriptInterface
+    public boolean randomEnabled() {
+        return RandomReminders.enabled(activity);
+    }
+
+    @JavascriptInterface
+    public void setRandom(boolean on) {
+        RandomReminders.setEnabled(activity, on);
+    }
+
+    /** Fresh text for the next nudge: which habits are still open today. */
+    @JavascriptInterface
+    public void setPending(String text) {
+        prefs.edit().putString(RandomReminders.KEY_PENDING, text == null ? "" : text).apply();
+    }
+
+    /** "18:40" when the next nudge is due, or "" if none is armed. */
+    @JavascriptInterface
+    public String nextNudge() {
+        long at = RandomReminders.nextAt(activity);
+        if (at <= 0L) return "";
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.setTimeInMillis(at);
+        return String.format("%02d:%02d", c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE));
+    }
+
     @JavascriptInterface
     public boolean supported() {
         return true;

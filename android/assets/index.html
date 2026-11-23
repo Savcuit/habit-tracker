@@ -738,6 +738,10 @@ function syncReminders(){
       bridge.schedule(h.id, hh, mm, h.name, "Time for " + h.name);
     });
     syncRiskReminder();
+    if(typeof bridge.setPending === "function"){
+      const open = scheduledToday().filter(h => !isDone(h)).map(h => h.name);
+      bridge.setPending(open.join(", "));
+    }
     return true;
   }catch(e){ return false; }
 }
@@ -1490,6 +1494,46 @@ function renderCalendar(){
 }
 
 /* ---------------------------------------------------------------- settings */
+
+function nudgesCard(){
+  const bridge = remindersAvailable();
+  const supported = bridge && typeof bridge.randomEnabled === "function";
+  const on = supported ? bridge.randomEnabled() : false;
+  const next = supported && typeof bridge.nextNudge === "function" ? bridge.nextNudge() : "";
+
+  const card = el("div", "card");
+  card.style.marginTop = "12px";
+  card.innerHTML = `<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:700;margin-bottom:8px">Surprise nudges</div>
+    <div class="small muted" style="line-height:1.5">A few times a day, at times the app chooses — between 09:00 and 21:30 — Pip taps you on the shoulder if something is still open.</div>`;
+
+  const row = el("div");
+  row.style.cssText = "display:flex;gap:10px;margin-top:12px";
+  const toggle = el("button", on ? "primary" : "ghost", on ? "On" : "Off");
+  toggle.style.flex = "1";
+  toggle.addEventListener("click", () => {
+    if(!supported) return toast("Nudges are Android-only");
+    bridge.setRandom(!on);
+    renderSettings();
+  });
+  const test = el("button", "ghost", "Test now");
+  test.style.flex = "1";
+  test.addEventListener("click", () => {
+    if(!supported) return toast("Nudges are Android-only");
+    bridge.setRandom(true);
+    toast("Nudges on — the first may arrive within the hour");
+    renderSettings();
+  });
+  row.appendChild(toggle);
+  row.appendChild(test);
+  card.appendChild(row);
+
+  if(on && next) card.insertAdjacentHTML("beforeend",
+    `<div class="small" style="color:var(--muted);margin-top:10px">Next nudge around <b>${next}</b></div>`);
+  if(!supported) card.insertAdjacentHTML("beforeend",
+    `<div class="small" style="color:var(--dim);margin-top:10px">Available in the Android app; the web version cannot wake the phone.</div>`);
+  return card;
+}
+
 function renderSettings(){
   const host = $("#page-settings");
   host.innerHTML = "";
@@ -1519,6 +1563,7 @@ function renderSettings(){
   host.appendChild(accent);
 
   host.appendChild(reminderCard());
+  host.appendChild(nudgesCard());
 
   const pipCard = el("div", "card");
   pipCard.style.marginTop = "12px";

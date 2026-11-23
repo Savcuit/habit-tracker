@@ -391,3 +391,23 @@ A guide, and a choice of mood for the app.
 Verified in a real browser: the welcome appears on a fresh install, choosing Cosy set the cream
 palette, rain at 11 °C produced the blue accent `#5B8DEF`, choosing a city fetched the weather and
 stored it, and switching back to Casual restored midnight with the cyan accent.
+
+## Version 7.0 — surprise nudges
+
+Reminders at times the app chooses, in the spirit of Duolingo, so a fixed 9 a.m. alarm cannot be
+tuned out.
+
+- A new card in **More → Surprise nudges**: on or off, with the time of the next one.
+- Android arms the first nudge between **09:00 and 10:30**, then waits a random **90 to 170
+  minutes** before the next, and stops at **21:30** — typically three to five a day.
+- Each nudge reschedules the following one itself, so the rhythm continues even if the app is never
+  opened; nothing depends on the page being alive.
+- The text knows what is still open: the app writes today's unfinished habit names to the phone, and
+  the notification reads *"Still open: Reading. Two minutes now is worth more than a perfect plan
+  later."* Titles and encouragement rotate from a small pool so no two nudges read alike.
+- Separate notification channel (*Surprise nudges*), so they can be silenced without touching habit
+  reminders.
+- The web build shows the card but explains that a browser cannot wake the phone.
+
+Verified with a stubbed Android bridge in a real browser: the card renders, the toggle calls through
+to the phone, the next-nudge time appears, and today's open habits are passed across as text.
