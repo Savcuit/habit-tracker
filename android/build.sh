@@ -34,8 +34,12 @@ echo "2/5 link"
 
 echo "3/5 compile java"
 find "$HERE/src" "$HERE/build/gen" -name "*.java" > "$HERE/build/sources.txt"
-javac -nowarn --release 8 -classpath "$ANDROID_JAR" \
-  -d "$HERE/build/classes" @"$HERE/build/sources.txt" 2>&1 | grep -v "bootstrap class path" || true
+if ! javac -nowarn --release 8 -classpath "$ANDROID_JAR" \
+  -d "$HERE/build/classes" @"$HERE/build/sources.txt" > "$HERE/build/javac.log" 2>&1; then
+  grep -v "bootstrap class path" "$HERE/build/javac.log" | tail -25
+  echo "javac failed — no APK produced" >&2
+  exit 1
+fi
 
 echo "4/5 dex"
 find "$HERE/build/classes" -name "*.class" > "$HERE/build/classes.txt"

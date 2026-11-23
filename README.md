@@ -431,3 +431,23 @@ what most trackers get wrong.
 
 Verified in a browser: a 3×/week habit showed `0/3 this week` and a two-week streak; a paused habit
 left today's list entirely; the widget payload is sent to the phone on every redraw.
+
+## Version 8.1 — two editions
+
+Everything above is in both. The difference is a single flag and, for the second, its own
+package, so both can be installed side by side.
+
+### Habit Tracker (`com.savcuit.habittracker`)
+
+The clean tracker. No points, no levels, no shop. If you would rather not be gamified, this is the one.
+
+### Habit Tracker XP (`com.savcuit.habittracker.xp`)
+
+Habitica's idea, without the pets: finishing a habit earns **XP and gold**, scaled by the streak
+(`10 + 2 per day of streak`, capped at 30), gold `3`, plus `2` extra whenever the streak hits a
+multiple of five. XP accumulates into **levels** on a rising curve — 100 XP for level 2, 200 more for
+level 3, and so on — shown as a live chip under the greeting and a bar in **More**. Gold buys
+**streak freezes at 40 each**, which turns the economy into something useful: a good week can pay for
+one bad day.
+
+Both editions are built from one source by `tools/build_variant.sh plain` and `tools/build_variant.sh xp`.

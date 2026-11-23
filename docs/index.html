@@ -267,6 +267,7 @@
       <h1 id="greeting">Good day</h1>
       <div class="small muted" id="dateLine"></div>
       <button id="freezeChip" class="freeze" type="button">❄ <b>2</b> freezes</button>
+      <span id="xpChip" class="freeze" style="display:none"></span>
     </div>
     <div class="ring">
       <svg width="74" height="74" viewBox="0 0 74 74">
@@ -307,6 +308,7 @@
 <div class="celeb" id="celeb"></div>
 <div id="toast"></div>
 
+<script>window.HABIT_XP = false;</script>
 <script>
 /* =============================================================== constants */
 const STORE_KEY = "nexus.habits.v2";
@@ -358,7 +360,7 @@ let state = loadState();
 let statsRange = 30;
 let calMonth = new Date();
 
-function defaultState(){ return { version: 2, habits: [], freezes: blankFreezes(), settings: { accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"", mode:"", city:"", weather:null } }; }
+function defaultState(){ return { version: 2, habits: [], freezes: blankFreezes(), game: { xp: 0, gold: 0 }, settings: { accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"", mode:"", city:"", weather:null } }; }
 
 function blankFreezes(){
   return { pool: FREEZE_START, max: FREEZE_MAX, used: {}, lastRefill: todayStr(), celebrated: {} };
@@ -366,6 +368,7 @@ function blankFreezes(){
 
 function normalise(data){
   data.settings = Object.assign({ accent:"#22d3ee", name:"", theme:"midnight", lastBackup:"", mode:"", city:"", weather:null }, data.settings||{});
+  data.game = Object.assign({ xp: 0, gold: 0 }, data.game || {});
   data.freezes = Object.assign(blankFreezes(), data.freezes||{});
   data.freezes.used = data.freezes.used || {};
   data.freezes.celebrated = data.freezes.celebrated || {};
@@ -420,6 +423,42 @@ function migrate(old){
 
 function saveState(data){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(data || state)); }catch(e){}
+}
+
+
+/* ======================================================= experience points */
+/* Off in the plain build; the XP build flips window.HABIT_XP before this runs. */
+
+const XP_MODE = !!window.HABIT_XP;
+const FREEZE_PRICE = 40;
+
+function levelInfo(xp){
+  let level = 1, need = 100 * level, spent = 0;
+  while(xp >= spent + need && level < 99){
+    spent += need; level++; need = 100 * level;
+  }
+  return { level: level, into: xp - spent, need: need };
+}
+
+function awardXp(h){
+  if(!XP_MODE) return null;
+  const s = streak(h);
+  const xp = Math.min(30, 10 + 2 * s);
+  const gold = 3 + (s > 0 && s % 5 === 0 ? 2 : 0);
+  state.game.xp += xp;
+  state.game.gold += gold;
+  saveState();
+  return { xp: xp, gold: gold };
+}
+
+function buyFreeze(){
+  if(!XP_MODE) return;
+  if(state.game.gold < FREEZE_PRICE){ toast("Not enough gold — " + state.game.gold + "/" + FREEZE_PRICE); return; }
+  if(state.freezes.pool >= state.freezes.max){ toast("Freezes are full"); return; }
+  state.game.gold -= FREEZE_PRICE;
+  state.freezes.pool++;
+  saveState(); renderAll(); renderSettings();
+  toast("❄ Freeze bought");
 }
 
 /* ================================================================ behaviour */
@@ -561,7 +600,12 @@ function toggleHabit(h, day){
   if(isDone(h, day)) delete h.log[day];
   else h.log[day] = target;
   saveState();
-  if(isDone(h, day)) celebrateIfMilestone(h);
+  if(isDone(h, day)){
+    const won = awardXp(h);
+    if(won) toast("+" + won.xp + " XP · +" + won.gold + " gold");
+    celebrateIfMilestone(h);
+  }
+  updateXpChip();
   syncRiskReminder();
 }
 
@@ -1122,6 +1166,15 @@ function renderAll(){
   pushWidget();
 }
 
+function updateXpChip(){
+  const chip = document.getElementById("xpChip");
+  if(!chip) return;
+  if(!XP_MODE){ chip.style.display = "none"; return; }
+  const info = levelInfo(state.game.xp);
+  chip.style.display = "inline-flex";
+  chip.innerHTML = "Lv " + info.level + " · " + info.into + "/" + info.need + " XP · " + state.game.gold + " gold";
+}
+
 function renderHeader(){
   const hour = new Date().getHours();
   const part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -1135,6 +1188,8 @@ function renderHeader(){
     chip.innerHTML = "❄ <b>" + pool + "</b> " + (pool === 1 ? "freeze" : "freezes");
     chip.classList.toggle("empty", pool === 0);
   }
+
+  updateXpChip();
 
   const list = scheduledToday();
   const done = list.filter(h => isDone(h)).length;
@@ -1581,6 +1636,26 @@ function renderCalendar(){
 
 /* ---------------------------------------------------------------- settings */
 
+
+function gameCard(){
+  if(!XP_MODE) return el("div");
+  const info = levelInfo(state.game.xp);
+  const card = el("div", "card");
+  card.style.marginTop = "12px";
+  card.innerHTML = `<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:700;margin-bottom:8px">Level ${info.level}</div>
+    <div class="small muted">${info.into} / ${info.need} XP to level ${info.level + 1}</div>
+    <div style="height:6px;border-radius:6px;background:rgba(255,255,255,.08);margin:10px 0 4px;overflow:hidden">
+      <div style="height:100%;width:${Math.round(100*info.into/info.need)}%;background:linear-gradient(90deg,var(--accent),#7c5cff)"></div>
+    </div>
+    <div class="small" style="color:var(--muted);margin-top:10px">${state.game.gold} gold · <b>${state.freezes.pool}</b>/${state.freezes.max} freezes</div>`;
+
+  const buy = el("button", "ghost", `Buy a freeze — ${FREEZE_PRICE} gold`);
+  buy.style.cssText = "width:100%;margin-top:12px";
+  buy.addEventListener("click", buyFreeze);
+  card.appendChild(buy);
+  return card;
+}
+
 function nudgesCard(){
   const bridge = remindersAvailable();
   const supported = bridge && typeof bridge.randomEnabled === "function";
@@ -1648,6 +1723,7 @@ function renderSettings(){
   accent.appendChild(sw);
   host.appendChild(accent);
 
+  host.appendChild(gameCard());
   host.appendChild(reminderCard());
   host.appendChild(nudgesCard());
 
